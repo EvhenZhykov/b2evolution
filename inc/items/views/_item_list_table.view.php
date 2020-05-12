@@ -7,7 +7,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}.
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}.
  * Parts of this file are copyright (c)2005 by Daniel HAHLER - {@link http://thequod.de/contact}.
  *
  * @package admin
@@ -45,7 +45,7 @@ else
 
 $ItemList->filter_area = array(
 		'callback' => 'callback_filter_item_list_table',
-		'hide_filter_button' => true,
+		'apply_filters_button' => 'none',
 	);
 
 
@@ -66,15 +66,14 @@ $ItemList->filter_area = array(
 
 $ItemList->title = sprintf( /* TRANS: list of "posts"/"intros"/"custom types"/etc */ T_('"%s" list'), $tab_type ).get_manual_link( $tab_type.'-list' );
 
+// Display a panel to confirm mass action with selected items:
+display_mass_items_confirmation_panel();
+
 // Initialize Results object
 items_results( $ItemList, array(
 		'tab' => $tab,
+		'display_selector' => true,
 	) );
-
-if( $ItemList->is_filtered() )
-{ // List is filtered, offer option to reset filters:
-	$ItemList->global_icon( T_('Reset all filters!'), 'reset_filters', '?ctrl=items&amp;blog='.$Blog->ID.'&amp;filter=reset', T_('Reset filters'), 3, 3, array( 'class' => 'action_icon btn-warning' ) );
-}
 
 // Generate global icons depending on seleted tab with item type
 item_type_global_icons( $ItemList );

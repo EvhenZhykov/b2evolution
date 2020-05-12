@@ -7,7 +7,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}.
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}.
  *
  * {@internal Below is a list of authors who have contributed to design/coding of this file: }}
  *
@@ -112,6 +112,7 @@ $Form->begin_fieldset( T_('Feedback options') . get_manual_link('comment-feedbac
 			array( 'allow_anon_url', 1, T_('Allow to submit an URL'), $edited_Blog->get_setting( 'allow_anon_url' ) )
 		), 'allow_anon_url', T_('Anonymous comments') );
 
+	$Form->text_input( 'comment_maxlen', $edited_Blog->get_setting( 'comment_maxlen' ), 4, T_('Max. comment length'), T_('Leave empty for unrestricted.') );
 	$Form->checkbox( 'allow_html_comment', $edited_Blog->get_setting( 'allow_html_comment' ),
 						T_( 'Allow HTML' ), T_( 'Check to allow HTML in comments.' ).' ('.T_('HTML code will pass several sanitization filters.').')' );
 
@@ -327,14 +328,14 @@ $Form->begin_fieldset( T_('Comment recycle bin').get_manual_link('recycle-bin-se
 $Form->end_fieldset();
 
 
-$Form->begin_fieldset( T_('Meta Comments').get_manual_link( 'meta-comments-settings' ) );
+$Form->begin_fieldset( T_('Internal Comments').get_manual_link( 'meta-comments-settings' ) );
 
-	$Form->checkbox( 'meta_comments_frontoffice', $edited_Blog->get_setting( 'meta_comments_frontoffice' ), T_('Display in Front-Office'), T_('Display meta comments in Front-Office.') );
+	$Form->checkbox( 'meta_comments_frontoffice', $edited_Blog->get_setting( 'meta_comments_frontoffice' ), T_('Display in Front-Office'), T_('Display internal comments in Front-Office.') );
 
 $Form->end_fieldset();
 
 
-$Form->end_form( array( array( 'submit', 'submit', T_('Save Changes!'), 'SaveButton' ) ) );
+$Form->end_form( array( array( 'submit', 'submit', T_('Save Changes!'), 'SaveButton', 'data-shortcut' => 'ctrl+s,command+s,ctrl+enter,command+enter' ) ) );
 
 echo '<div class="well">';
 echo '<p>'.sprintf( T_('You can find more settings in the <a %s>Post Types</a>, including:'), 'href="'.$admin_url.'?blog='.$edited_Blog->ID.'&amp;ctrl=itemtypes&amp;ityp_ID='.$edited_Blog->get_setting( 'default_post_type' ).'&amp;action=edit"' ).'</p>';

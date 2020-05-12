@@ -24,10 +24,13 @@ $Form->hidden( 'itcf_ID', get_param( 'itcf_ID' ) );
 $Form->text( 'itcf_order', get_param( 'itcf_order' ), 6, T_('Order'), '', 11 );
 
 // Title:
-$Form->text( 'itcf_label', get_param( 'itcf_label' ), 120, T_('Title'), '', 255 );
+$Form->text( 'itcf_label', get_param( 'itcf_label' ), 120, T_('Label'), '', 255 );
 
 // Name:
 $Form->text( 'itcf_name', get_param( 'itcf_name' ), 60, T_('Name'), '', 255 );
+
+// Schema Property Name:
+$Form->text( 'itcf_schema_prop', get_param( 'itcf_schema_prop' ), 60, T_('Schema Property Name'), '', 255 );
 
 // Type:
 $Form->info( T_('Type'), get_item_type_field_type_title( get_param( 'itcf_type' ) ) );
@@ -56,8 +59,17 @@ if( get_param( 'itcf_type' ) == 'computed' )
 // Note:
 $Form->text( 'itcf_note', get_param( 'itcf_note' ), 60, T_('Note'), '', 255 );
 
+// Required:
+$Form->checkbox( 'itcf_required', get_param( 'itcf_required' ), T_('Required') );
+
+// With MC(Internal Comment):
+$Form->checkbox( 'itcf_meta', get_param( 'itcf_meta' ), T_('With MC'), T_('Allow update with Internal Comment') );
+
 // Public:
 $Form->checkbox( 'itcf_public', get_param( 'itcf_public' ), T_('Public') );
+
+// Display condition:
+$Form->text( 'itcf_disp_condition', get_param( 'itcf_disp_condition' ), 60, T_('Display condition'), '', 2000 );
 
 // Header cell class:
 $Form->text( 'itcf_header_class', get_param( 'itcf_header_class' ), 60, T_('Header cell class'), sprintf( T_('Enter class names such as %s etc. (Separate with space)'), '<code>left</code> <code>center</code> <code>right</code> <code>nowrap</code>' ), 255 );

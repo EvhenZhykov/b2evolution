@@ -77,6 +77,7 @@ $Form->begin_form( '', '', $params );
 
 	// Fields used in "advanced" form, but not here:
 	$Form->hidden( 'post_locale', $edited_Item->get( 'locale' ) );
+	$Form->hidden( 'post_locale_visibility', $edited_Item->get( 'locale_visibility' ) );
 	$Form->hidden( 'item_typ_ID', $edited_Item->ityp_ID );
 	$Form->hidden( 'post_url', $edited_Item->get( 'url' ) );
 	$Form->hidden( 'post_excerpt', $edited_Item->get( 'excerpt' ) );
@@ -86,19 +87,28 @@ $Form->begin_form( '', '', $params );
 	$Form->hidden( 'metadesc', $edited_Item->get_setting( 'metadesc' ) );
 	$Form->hidden( 'metakeywords', $edited_Item->get_setting( 'metakeywords' ) );
 
-	if( $Blog->get_setting( 'use_workflow' ) && $current_User->check_perm( 'blog_can_be_assignee', 'edit', false, $Blog->ID ) )
-	{	// We want to use workflow properties for this blog:
-		$Form->hidden( 'item_priority', $edited_Item->priority );
-		$Form->hidden( 'item_assigned_user_ID', $edited_Item->assigned_user_ID );
+	if( $edited_Item->can_edit_workflow( 'status' ) )
+	{	// Allow workflow status if current user can edit this property:
 		$Form->hidden( 'item_st_ID', $edited_Item->pst_ID );
-		if( $Blog->get_setting( 'use_deadline' ) )
-		{	// If deadline is enabled for collection:
-			$Form->hidden( 'item_deadline', $edited_Item->datedeadline );
-		}
+	}
+	if( $edited_Item->can_edit_workflow( 'status' ) )
+	{	// Allow workflow user if current user can edit this property:
+		$Form->hidden( 'item_assigned_user_ID', $edited_Item->assigned_user_ID );
+	}
+	if( $edited_Item->can_edit_workflow( 'priority' ) )
+	{	// Allow workflow priority if current user can edit this property:
+		$Form->hidden( 'item_priority', $edited_Item->priority );
+	}
+	if( $edited_Item->can_edit_workflow( 'deadline' ) )
+	{	// Allow workflow deadline if current user can edit this property:
+		$Form->hidden( 'item_deadline', mysql2date( locale_input_datefmt(), $edited_Item->datedeadline ) );
+		$Form->hidden( 'item_deadline_time', mysql2date( 'H:i', $edited_Item->datedeadline ) );
 	}
 	$Form->hidden( 'trackback_url', $trackback_url );
 	$Form->hidden( 'item_featured', $edited_Item->featured );
 	$Form->hidden( 'item_hideteaser', $edited_Item->get_setting( 'hide_teaser' ) );
+	$Form->hidden( 'item_switchable', $edited_Item->get_setting( 'switchable' ) );
+	$Form->hidden( 'item_switchable_params', $edited_Item->get_setting( 'switchable_params' ) );
 	$Form->hidden( 'expiry_delay', $edited_Item->get_setting( 'comment_expiry_delay' ) );
 	$Form->hidden( 'goal_ID', $edited_Item->get_setting( 'goal_ID' ) );
 	// CUSTOM FIELDS

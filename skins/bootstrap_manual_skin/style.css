@@ -1,9 +1,6 @@
 #header {
   margin-bottom: 20px;
 }
-#header.site_skins {
-  margin-top: 58px;
-}
 .evo_container__page_top {
   margin-top: 20px;
 }
@@ -28,6 +25,7 @@
 }
 @media (max-height: 800px), (max-width: 992px) {
   #evo_container__sidebar.fixed,
+  #evo_container__sidebar_2.fixed,
   #evo_container__sidebar_single.fixed {
     position: static;
   }
@@ -80,9 +78,6 @@ div.extended_search_form .search_options {
 div.extended_search_form .search_options .search_option {
   display: inline-block;
   margin-right: 10px;
-}
-label.control-label[for=post_title] {
-  width: auto;
 }
 textarea.message_text {
   width: 95%;
@@ -270,9 +265,21 @@ div.log_container {
   font-size: inherit;
   margin-right: 5px;
 }
+.posts_list h3 + .btn {
+  margin: -10px 0 0 30px;
+}
+.posts_list h3 .evo_post_read_status {
+  text-decoration: none;
+  display: inline-block;
+  vertical-align: middle;
+  font-size: 85%;
+  margin-top: -10px;
+}
 .posts_list li > .btn-group,
-.posts_list li > .evo_status {
-  margin: 0 0 6px 30px;
+.posts_list .evo_container__item_in_list .widget_core_item_title > .btn-group,
+.posts_list li > .evo_status,
+.posts_list .evo_container__item_in_list .widget_core_item_title > .evo_status {
+  margin: -6px 0 0 30px;
 }
 ol.breadcrumb {
   margin-left: 0;
@@ -282,19 +289,21 @@ ol.breadcrumb img {
 }
 .evo_post_title,
 .cat_title {
-  display: table;
+  display: -ms-flexbox;
+  display: flex;
+  -ms-flex-align: center;
+      align-items: center;
+  -ms-flex-wrap: wrap;
+      flex-wrap: wrap;
 }
 .evo_post_title h1,
 .cat_title h1 {
-  display: table-cell;
   margin: 0;
   padding: 20px 0 10px;
 }
 .evo_post_title .btn-group,
 .cat_title .btn-group {
-  display: table-cell;
   padding: 20px 0 10px 30px;
-  vertical-align: middle;
   white-space: nowrap;
 }
 .evo_post_title .btn-group .btn,
@@ -326,4 +335,12 @@ ol.breadcrumb img {
 .evo_content_block .evo_comment .btn-group > .btn.first-child {
   border-top-left-radius: 3px !important;
   border-bottom-left-radius: 3px !important;
+}
+.widget_core_coll_featured_intro .featurepost {
+  background-color: #d9edf7;
+  padding: 15px 15px 25px;
+  margin-bottom: 20px;
+  border: 1px solid #e3e3e3;
+  border-radius: 4px;
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.05);
 }

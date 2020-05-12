@@ -9,7 +9,7 @@
  *
  * b2evolution - {@link http://b2evolution.net/}
  * Released under GNU GPL License - {@link http://b2evolution.net/about/gnu-gpl-license}
- * @copyright (c)2003-2019 by Francois Planque - {@link http://fplanque.com/}
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}
  *
  * @package evoskins
  */
@@ -41,7 +41,7 @@ $params = array_merge( array(
 		'after_image'              => '</figure>',
 		'after_images'             => '</div>',
 		'image_class'              => 'img-responsive',
-		'image_size'               => 'crop-top-320x320',
+		'image_size'               => 'crop-320x320',
 		'image_limit'              =>  1000,
 		'image_link_to'            => 'original', // Can be 'original', 'single' or empty
 		'excerpt_image_class'      => '',
@@ -100,12 +100,14 @@ if( mainlist_get_item() )
 			// CODE for the widget:
 			'widget' => 'breadcrumb_path',
 			// Optional display params
-			'block_start'      => '<ol class="breadcrumb">',
-			'block_end'        => '</ol><div class="clear"></div>',
-			'separator'        => '',
-			'item_mask'        => '<li><a href="$url$">$title$</a></li>',
-			'item_active_mask' => '<li class="active">$title$</li>',
-			'coll_logo_size'   => 'fit-128x16',
+			'block_start'           => '<ol class="breadcrumb">',
+			'block_end'             => '</ol><div class="clear"></div>',
+			'separator'             => '',
+			'item_mask'             => '<li><a href="$url$">$title$</a></li>',
+			'item_logo_mask'        => '<li>$logo$ <a href="$url$">$title$</a></li>',
+			'item_active_logo_mask' => '<li class="active">$logo$ $title$</li>',
+			'item_active_mask'      => '<li class="active">$title$</li>',
+			'coll_logo_size'        => 'fit-128x16',
 		) );
 ?>
 
@@ -113,23 +115,6 @@ if( mainlist_get_item() )
 <a name="p<?php echo $Item->ID; ?>"></a>
 
 <?php
-	// ------------------- PREV/NEXT POST LINKS (SINGLE POST MODE) -------------------
-	item_prevnext_links( array(
-			'block_start'     => '<ul class="pager col-lg-12 post_nav">',
-			'prev_start'      => '<li class="previous">',
-			'prev_text'       => '<span aria-hidden="true">&larr;</span> $title$',
-			'prev_end'        => '</li>',
-			'separator'       => ' ',
-			'next_start'      => '<li class="next">',
-			'next_text'       => '$title$ <span aria-hidden="true">&rarr;</span>',
-			'next_end'        => '</li>',
-			'block_end'       => '</ul>',
-			'target_blog'     => $Blog->ID,	// this forces to stay in the same blog, should the post be cross posted in multiple blogs
-			'post_navigation' => 'same_category', // force to stay in the same category in this skin
-			'featured'        => false, // don't include the featured posts into navigation list
-		) );
-	// ------------------------- END OF PREV/NEXT POST LINKS -------------------------
-
 	$Item->locale_temp_switch(); // Temporarily switch to post locale (useful for multilingual blogs)
 ?>
 
@@ -137,25 +122,28 @@ if( mainlist_get_item() )
 
 	<div class="single_page_title">
 		<?php
-			if( $Item->status != 'published' )
-			{	// Display not public Item's status:
-				$Item->format_status( array(
-						'template' => '<div class="evo_status evo_status__$status$ badge pull-right" data-toggle="tooltip" data-placement="top" title="$tooltip_title$">$status_title$</div>',
-					) );
-			}
-
 			// ------------------------- "Item Single - Header" CONTAINER EMBEDDED HERE --------------------------
 			// Display container contents:
-			skin_container( /* TRANS: Widget container name */ NT_('Item Single Header'), array(
-				'widget_context' => 'item',	// Signal that we are displaying within an Item
+			widget_container( 'item_single_header', array(
+				'widget_context'             => 'item',	// Signal that we are displaying within an Item
 				// The following (optional) params will be used as defaults for widgets included in this container:
+				'container_display_if_empty' => false, // If no widget, don't display container at all
 				// This will enclose each widget in a block:
-				'block_start' => '<div class="evo_widget $wi_class$">',
-				'block_end' => '</div>',
+				'block_start'                => '<div class="evo_widget $wi_class$">',
+				'block_end'                  => '</div>',
 				// This will enclose the title of each widget:
-				'block_title_start' => '<h3>',
-				'block_title_end' => '</h3>',
-				'author_link_text' => $params['author_link_text'],
+				'block_title_start'          => '<h3>',
+				'block_title_end'            => '</h3>',
+				'author_link_text'           => $params['author_link_text'],
+				// Controlling the title:
+				'widget_item_title_display' => false,
+				// Item Next Previous widget
+				'widget_item_next_previous_display' => ! $Item->is_featured(), // Do not show Item Next Previous widget if featured item
+				'widget_item_next_previous_params' => array(
+						'target_blog'     => $Blog->ID,	// this forces to stay in the same blog, should the post be cross posted in multiple blogs
+						'post_navigation' => 'same_category', // force to stay in the same category in this skin
+						'featured'        => false, // don't include the featured posts into navigation list
+					),
 			) );
 			// ----------------------------- END OF "Item Single - Header" CONTAINER -----------------------------
 		?>
@@ -164,12 +152,13 @@ if( mainlist_get_item() )
 	<div class="row">
 		<div class="<?php echo $Skin->get_column_class( 'single' ); ?>">
 
-	<section class="table evo_content_block">
+	<section class="table evo_content_block<?php echo ' evo_voting_layout__'.$Skin->get_setting( 'voting_place' ); ?>">
 	<div class="panel panel-default">
 		<div class="panel-heading posts_panel_title_wrapper">
 			<div class="cell1 ellipsis">
 				<h4 class="evo_comment_title panel-title"><a href="<?php echo $Item->get_permanent_url(); ?>" class="permalink">#1</a>
 					<?php
+						// Display author avatar:
 						$Item->author( array(
 							'link_text' => 'auto',
 						) );
@@ -198,13 +187,20 @@ if( mainlist_get_item() )
 		</div>
 
 		<div class="panel-body">
-			<div class="ft_avatar col-md-1 col-sm-2"><?php
-				$Item->author( array(
-					'link_text'  => 'only_avatar',
-					'thumb_size' => 'crop-top-80x80',
-				) );
+			<div class="ft_avatar<?php echo $Skin->get_setting( 'voting_place' ) == 'under_content' ? ' col-md-1 col-sm-2' : ''; ?>"><?php
+				if( $Skin->get_setting( 'voting_place' ) == 'left_score' )
+				{	// Display voting panel instead of author avatar:
+					$Skin->display_item_voting_panel( $Item, 'left_score' );
+				}
+				else
+				{	// Display author avatar:
+					$Item->author( array(
+						'link_text'  => 'only_avatar',
+						'thumb_size' => 'crop-top-80x80',
+					) );
+				}
 			?></div>
-			<div class="post_main col-md-11 col-sm-10">
+			<div class="post_main<?php echo $Skin->get_setting( 'voting_place' ) == 'under_content' ? ' col-md-11 col-sm-10' : ''; ?>">
 
 	<div class="row">
 		<div class="col-sm-5">
@@ -244,7 +240,7 @@ if( mainlist_get_item() )
 			$Item->title( array(
 					'before'    => $params['item_title_before'],
 					'after'     => $params['item_title_after'],
-					'link_type' => '#'
+					'link_type' => 'permalink'
 				) );
 
 			// Item Content Teaser:
@@ -284,7 +280,7 @@ if( mainlist_get_item() )
 			$Item->custom_fields( array(
 					'fields'                               => 'course,cuisine,servings',
 					'custom_fields_table_start'            => '',
-					'custom_fields_row_start'              => '<div class="row">',
+					'custom_fields_row_start'              => '<div class="row"$row_attrs$>',
 					'custom_fields_row_header_field'       => '<div class="col-xs-3 $header_cell_class$"><b>$field_title$$field_description_icon$</b></div>',
 					'custom_fields_description_icon_class' => 'grey',
 					'custom_fields_value_default'          => '<div class="col-xs-9 $data_cell_class$"$data_cell_attrs$>$field_value$</div>',
@@ -296,11 +292,11 @@ if( mainlist_get_item() )
 			$Item->custom_fields( array(
 					'fields'                               => 'prep_time,cook_time,passive_time,total_time',
 					'custom_fields_table_start'            => '<br /><div class="row">',
-					'custom_fields_row_start'              => '',
+					'custom_fields_row_start'              => '<span$row_attrs$>',
 					'custom_fields_row_header_field'       => '<div class="col-sm-3 col-xs-6 $header_cell_class$"><b>$field_title$$field_description_icon$</b>',
 					'custom_fields_description_icon_class' => 'grey',
 					'custom_fields_value_default'          => '<br /><span class="$data_cell_class$"$data_cell_attrs$>$field_value$</span></div>',
-					'custom_fields_row_end'                => '',
+					'custom_fields_row_end'                => '</span>',
 					'custom_fields_table_end'              => '</div>',
 					'hide_empty_lines'                     => true,
 				) );
@@ -309,27 +305,11 @@ if( mainlist_get_item() )
 	</div>
 
 	<div class="row">
-		<?php
-		// Custom field "Ingredients" (if it exists for current Item):
-		$ingredients = $Item->get_custom_field_value( 'ingredients' );
-		if( $ingredients !== false )
-		{	// Display "Ingredients" only if this custom field exists for the current Item:
-		?>
 		<div class="col-lg-3 col-sm-4">
-			<h4><?php echo $Item->get_custom_field_title( 'ingredients' ); ?></h4>
-			<p><?php echo $ingredients; ?></p>
+			<h4><?php $Item->custom( array( 'field' => 'ingredients', 'what' => 'label' )  ); ?></h4>
+			<p><?php $Item->custom( array( 'field' => 'ingredients' ) ); ?></p>
 		</div>
-		<?php
-			$directions_col_size = 'col-lg-9 col-sm-8';
-		}
-		else
-		{	// Use full width if ingredients field is not detected:
-			$directions_col_size = 'col-sm-12';
-		}
-
-		// Directions:
-		?>
-		<div class="<?php echo $directions_col_size; ?>">
+		<div class="col-lg-9 col-sm-8">
 			<h4><?php echo T_('Directions'); ?></h4>
 			<?php
 			// Display the "after more" part of the text: (part after "[teaserbreak]")
@@ -381,12 +361,12 @@ if( mainlist_get_item() )
 				}
 				if( $bbcode_plugin_is_enabled && $Item->can_comment( NULL ) )
 				{	// Display button to quote this post
-					echo '<a href="'.$Item->get_permanent_url().'?mode=quote&amp;qp='.$Item->ID.'#form_p'.$Item->ID.'" title="'.T_('Reply with quote').'" class="'.button_class( 'text' ).' pull-left quote_button">'.get_icon( 'comments', 'imgtag', array( 'title' => T_('Reply with quote') ) ).' '.T_('Quote').'</a>';
+					echo '<a href="'.$Item->get_permanent_url().'?quote_post='.$Item->ID.'#form_p'.$Item->ID.'" title="'.format_to_output( T_('Reply with quote'), 'htmlattr' ).'" class="'.button_class( 'text' ).' pull-left quote_button">'.get_icon( 'comments', 'imgtag', array( 'title' => T_('Reply with quote') ) ).' '.T_('Quote').'</a>';
 				}
 
 				if( $disp != 'page' )
 				{	// Display a panel with voting buttons for item:
-					$Skin->display_item_voting_panel( $Item );
+					$Skin->display_item_voting_panel( $Item, 'under_content' );
 				}
 
 				echo '<span class="pull-left">';
@@ -441,9 +421,9 @@ if( mainlist_get_item() )
 			'comment_status_before' => '</h4></div>',
 			'comment_title_after'   => '</div>',
 
-			'comment_avatar_before' => '<span class="evo_comment_avatar col-md-1 col-sm-2">',
+			'comment_avatar_before' => '<span class="evo_comment_avatar'.( $Skin->get_setting( 'voting_place' ) == 'under_content' ? ' col-md-1 col-sm-2' : '' ).'">',
 			'comment_avatar_after'  => '</span>',
-			'comment_text_before'   => '<div class="evo_comment_text col-md-11 col-sm-10">',
+			'comment_text_before'   => '<div class="evo_comment_text'.( $Skin->get_setting( 'voting_place' ) == 'under_content' ? ' col-md-11 col-sm-10' : '' ).'">',
 			'comment_text_after'    => '</div>',
 		) ) );
 		// Note: You can customize the default item feedback by copying the generic
@@ -496,9 +476,9 @@ if( mainlist_get_item() )
 						'search_submit_after'  => '</span></div>',
 						// Widget 'Item Custom Fields':
 						'custom_fields_table_start'                => '<div class="item_custom_fields">',
-						'custom_fields_row_start'                  => '<div class="row">',
+						'custom_fields_row_start'                  => '<div class="row"$row_attrs$>',
 						'custom_fields_topleft_cell'               => '<div class="col-md-12 col-xs-6" style="border:none"></div>',
-						'custom_fields_col_header_item'            => '<div class="col-md-12 col-xs-6 center" width="$col_width$"$col_attrs$>$item_link$$item_status$</div>',  // Note: we will also add reverse view later: 'custom_fields_col_header_field
+						'custom_fields_col_header_item'            => '<div class="$col_class$ col-md-12 col-xs-6 center" width="$col_width$"$col_attrs$>$item_link$$item_status$</div>',  // Note: we will also add reverse view later: 'custom_fields_col_header_field
 						'custom_fields_row_header_field'           => '<div class="col-md-12 col-xs-6"><b>$field_title$$field_description_icon$:</b></div>',
 						'custom_fields_item_status_template'       => '<div><div class="evo_status evo_status__$status$ badge" data-toggle="tooltip" data-placement="top" title="$tooltip_title$">$status_title$</div></div>',
 						'custom_fields_description_icon_class'     => 'grey',
@@ -506,7 +486,7 @@ if( mainlist_get_item() )
 						'custom_fields_value_difference_highlight' => '<div class="col-md-12 col-xs-6 bg-warning"$data_cell_attrs$>$field_value$</div>',
 						'custom_fields_value_green'                => '<div class="col-md-12 col-xs-6 bg-success"$data_cell_attrs$>$field_value$</div>',
 						'custom_fields_value_red'                  => '<div class="col-md-12 col-xs-6 bg-danger"$data_cell_attrs$>$field_value$</div>',
-						'custom_fields_edit_link_cell'             => '<div class="col-md-12 col-xs-6 center">$edit_link$</div>',
+						'custom_fields_edit_link_cell'             => '<div class="col-md-12 col-xs-6 center"$edit_link_attrs$>$edit_link$</div>',
 						'custom_fields_edit_link_class'            => 'btn btn-xs btn-default',
 						'custom_fields_row_end'                    => '</div>',
 						'custom_fields_table_end'                  => '</div>',

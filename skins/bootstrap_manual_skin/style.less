@@ -1,9 +1,6 @@
 // -------------------------- Header --------------------------
 #header {
 	margin-bottom: 20px;
-	&.site_skins {
-		margin-top: 58px;
-	}
 }
 .evo_container__page_top {
 	margin-top: 20px;
@@ -20,17 +17,16 @@
 	padding-top: 30px;
 }
 
-// -------------------------- Left sidebar --------------------------
+// -------------------------- Sidebars --------------------------
 #evo_container__sidebar, #evo_container__sidebar_2, #evo_container__sidebar_single {
 	background: #FFF;
 	&.fixed {
 		position: fixed;
 	}
 }
-// Windows with height <= 800px OR width <= 992px:
-// Don't fix a position of the left side bar
+// Don't fix a position of ALL sidebars when window height <= 800px OR width <= 992px:
 @media (max-height:800px),(max-width:992px) {
-	#evo_container__sidebar, #evo_container__sidebar_single {
+	#evo_container__sidebar, #evo_container__sidebar_2, #evo_container__sidebar_single {
 		&.fixed {
 			position: static;
 		}
@@ -98,11 +94,6 @@ div.extended_search_form {
 			margin-right: 10px;
 		}
 	}
-}
-
-// Form elements on item edit page
-label.control-label[for=post_title] {
-	width: auto;
 }
 
 // A form to create a new message/thread
@@ -200,7 +191,7 @@ div.bSideItem {
 		}
 	}
 }
-@media (min-width: 768px) {
+@media (min-width: 768px) { // Bootstrap SM starts at 768px
 	#fieldset_wrapper_captcha_qstn .panel div[id$=_answer] {
 		max-height: 34px;
 	}
@@ -302,10 +293,20 @@ div.action_messages, div.log_container {
 				margin-right: 5px;
 			}
 		}
+		+ .btn {
+			margin: -10px 0 0 30px;
+		}
+		.evo_post_read_status {
+			text-decoration: none;
+			display: inline-block;
+			vertical-align: middle;
+			font-size: 85%;
+			margin-top: -10px;
+		}
 	}
-	li {
+	li, .evo_container__item_in_list .widget_core_item_title {
 		> .btn-group, > .evo_status {
-			margin: 0 0 6px 30px;
+			margin: -6px 0 0 30px;
 		}
 	}
 }
@@ -320,23 +321,25 @@ ol.breadcrumb {
 
 // Positions on the action buttons near page titles
 .evo_post_title, .cat_title {
-	display: table;
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
 	h1 {
-		display: table-cell;
+		//display: table-cell;
 		margin: 0;
 		padding: 20px 0 10px;
 	}
 	.btn-group {
-		display: table-cell;
+		//display: table-cell;
 		padding: 20px 0 10px 30px;
-		vertical-align: middle;
+		//vertical-align: middle;
 		white-space: nowrap;
 		.btn {
 			float: none;
 		}
 	}
 }
-@media (max-width: 767px) {
+@media (max-width: 767px) { // Bootstrap XS ends at 767, SM starts at 768
 	.evo_post_title, .cat_title {
 		display: block;
 		h1 {
@@ -366,5 +369,17 @@ ol.breadcrumb {
 	.btn-group>.btn.first-child {
 		border-top-left-radius: 3px !important;
 		border-bottom-left-radius: 3px !important;
+	}
+}
+
+// Featured Post
+.widget_core_coll_featured_intro {
+	.featurepost {
+		background-color: #d9edf7;
+		padding: 15px 15px 25px;
+		margin-bottom: 20px;
+		border: 1px solid #e3e3e3;
+		border-radius: 4px;
+		box-shadow: inset 0 1px 1px rgba(0,0,0,.05);
 	}
 }

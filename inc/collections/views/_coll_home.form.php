@@ -7,7 +7,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}.
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}.
  *
  * {@internal Below is a list of authors who have contributed to design/coding of this file: }}
  *
@@ -51,6 +51,7 @@ $Form->begin_fieldset( T_('Front page').get_manual_link('collection-front-page-s
 			array( 'users',    T_('Users') ),
 			array( 'terms',    T_('Terms & Conditions') ),
 			array( 'flagged',  T_('Flagged Items') ),
+			array( 'mustread', T_('Must Read Items') ),
 			array( 'single',   T_('First post') ),
 			array( 'page',     T_('A specific page') ),
 		);

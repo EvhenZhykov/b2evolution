@@ -21,7 +21,7 @@ class photoalbums_Skin extends Skin
 	 * Skin version
 	 * @var string
 	 */
-	var $version = '6.11.4';
+	var $version = '7.1.2';
 
 	/**
 	 * Get default name for the skin.
@@ -39,6 +39,35 @@ class photoalbums_Skin extends Skin
 	function get_default_type()
 	{
 		return 'normal';
+	}
+
+
+	/**
+	 * Get the container codes of the skin main containers
+	 *
+	 * This should NOT be protected. It should be used INSTEAD of file parsing.
+	 * File parsing should only be used if this function is not defined
+	 *
+	 * @return array Array which overrides default containers; Empty array means to use all default containers.
+	 */
+	function get_declared_containers()
+	{
+		// Array to override default containers from function get_skin_default_containers():
+		// - Key is widget container code;
+		// - Value: array( 0 - container name, 1 - container order ),
+		//          NULL - means don't use the container, WARNING: it(only empty/without widgets) will be deleted from DB on changing of collection skin or on reload container definitions.
+		return array(
+				'header'                    => NULL,
+				'front_page_secondary_area' => NULL,
+				'item_list'                 => NULL,
+				'item_in_list'              => NULL,
+				'item_single_header'        => NULL,
+				'item_page'                 => NULL,
+				'sidebar_2'                 => NULL,
+				'footer'                    => NULL,
+				'user_profile_left'         => NULL,
+				'user_profile_right'        => NULL,
+			);
 	}
 
 
@@ -96,37 +125,31 @@ class photoalbums_Skin extends Skin
 		$r = array_merge( array(
 				'menu_bg_color' => array(
 					'label' => T_('Menu background color'),
-					'note' => T_('E-g: #0000ff for blue'),
 					'defaultvalue' => '#333333',
 					'type' => 'color',
 				),
 				'menu_text_color' => array(
 					'label' => T_('Menu text color'),
-					'note' => T_('E-g: #ff6600 for orange'),
 					'defaultvalue' => '#AAAAAA',
 					'type' => 'color',
 				),
 				'page_bg_color' => array(
 					'label' => T_('Page background color'),
-					'note' => T_('E-g: #ff0000 for red'),
 					'defaultvalue' => '#666666',
 					'type' => 'color',
 				),
 				'page_text_color' => array(
 					'label' => T_('Page text color'),
-					'note' => T_('E-g: #00ff00 for green'),
 					'defaultvalue' => '#AAAAAA',
 					'type' => 'color',
 				),
 				'post_bg_color' => array(
 					'label' => T_('Post info background color'),
-					'note' => T_('E-g: #0000ff for blue'),
 					'defaultvalue' => '#555555',
 					'type' => 'color',
 				),
 				'post_text_color' => array(
 					'label' => T_('Post info text color'),
-					'note' => T_('E-g: #ff6600 for orange'),
 					'defaultvalue' => '#AAAAAA',
 					'type' => 'color',
 				),
@@ -195,13 +218,6 @@ class photoalbums_Skin extends Skin
 					'note' => T_('Display banner for "Public" posts (posts & comments)'),
 					'defaultvalue' => 1,
 					'type' => 'checkbox',
-				),
-				'mediaidx_thumb_size' => array(
-					'label' => T_('Thumbnail size for media index'),
-					'note' => '',
-					'defaultvalue' => 'fit-128x128',
-					'options' => get_available_thumb_sizes(),
-					'type' => 'select',
 				),
 				'posts_thumb_size' => array(
 					'label' => T_('Thumbnail size in post list'),

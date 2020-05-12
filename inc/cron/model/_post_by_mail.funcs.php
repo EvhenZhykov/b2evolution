@@ -7,7 +7,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}
  *
  * @package admin
  */
@@ -469,6 +469,7 @@ function pbm_process_messages( & $mbox, $limit, $cron = false )
 		// Typically stuff that will help the content to validate
 		// Useful for code display
 		// Will probably be used for validation also
+		// + APPLY RENDERING from Rendering Plugins:
 		$Plugins_admin = & get_Plugins_admin();
 		$params = array( 'object_type' => 'Item', 'object_Blog' => & $pbmBlog );
 		$Plugins_admin->filter_contents( $post_title /* by ref */, $content /* by ref */, $renderers, $params );

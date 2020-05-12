@@ -6,7 +6,7 @@
  *
  * b2evolution - {@link http://b2evolution.net/}
  * Released under GNU GPL License - {@link http://b2evolution.net/about/gnu-gpl-license}
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}
  *
  * @package evoskins
  */
@@ -240,7 +240,7 @@ function validateCommentForm(form)
 	{	// User is not logged in or not activated:
 		if( is_logged_in() && empty( $comment_author ) && empty( $comment_author_email ) )
 		{
-			$comment_author = $current_User->login;
+			$comment_author = $current_User->get_username();
 			$comment_author_email = $current_User->email;
 		}
 		// Note: we use funky field names to defeat the most basic guestbook spam bots

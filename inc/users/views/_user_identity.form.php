@@ -7,7 +7,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}
  * Parts of this file are copyright (c)2004-2006 by Daniel HAHLER - {@link http://thequod.de/contact}.
  *
  * @package admin
@@ -264,14 +264,13 @@ if( $action != 'view' )
 		$Form->text_input( 'edited_user_nickname', $edited_User->nickname, 20, T_('Nickname'), '', array( 'maxlength' => 50, 'required' => ( $nickname_editing == 'edited-user-required' ) ) );
 	}
 
-	$gender_editing = $Settings->get( 'registration_require_gender' );
-	if( $gender_editing != 'hidden' && ( $edited_User->ID == $current_User->ID || $has_moderate_access ) )
+	if( $edited_User->ID == $current_User->ID || $has_moderate_access )
 	{
 		$Form->radio( 'edited_user_gender', $edited_User->get('gender'), array(
 				array( 'M', T_('A man') ),
 				array( 'F', T_('A woman') ),
 				array( 'O', T_('Other') ),
-			), T_('I am'), false, '', $Settings->get( 'registration_require_gender' ) == 'required' );
+			), T_('I am'), false, '' );
 	}
 
 	$button_refresh_regional = '<button id="%s" type="submit" name="actionArray[refresh_regional]" class="action_icon refresh_button">'.get_icon( 'refresh' ).'</button>';
@@ -333,10 +332,57 @@ if( $action != 'view' )
 			);
 	}
 
-	$Form->begin_line( T_('My age group'), 'edited_user_age_min' );
-		$Form->text( 'edited_user_age_min', $edited_User->age_min, 3, '' );
-		$Form->text( 'edited_user_age_max', $edited_User->age_max, 3, T_('to') );
-	$Form->end_line();
+	if( $Settings->get( 'self_selected_age_group' ) != 'hidden' )
+	{
+		$Form->begin_line( T_('My age group'), 'edited_user_age_min', '', array( 'required' => $Settings->get( 'self_selected_age_group' ) == 'required' ) );
+			$Form->text_input( 'edited_user_age_min', $edited_User->age_min, 3, '', '', array( 'required' => $Settings->get( 'self_selected_age_group' ) == 'required', 'input_suffix' => ' '.T_('to').' ' ) );
+			$Form->text_input( 'edited_user_age_max', $edited_User->age_max, 3, '', '', array( 'required' => $Settings->get( 'self_selected_age_group' ) == 'required' ) );
+		$Form->end_line();
+	}
+
+	if( $Settings->get( 'birthday_year' ) != 'hidden' || $Settings->get( 'birthday_month') != 'hidden' || $Settings->get( 'birthday_day') != 'hidden' )
+	{
+		$Form->begin_line( T_('Birthday'), 'edited_user_birthday_month', '', array( 'required' => ( $Settings->get( 'birthday_year' ) == 'required' || $Settings->get( 'birthday_month') == 'required' || $Settings->get( 'birthday_day') == 'required' ) ) );
+			if( $Settings->get( 'birthday_month' ) != 'hidden' )
+			{
+				global $month;
+				$birthday_months = array();
+				if( $Settings->get( 'birthday_month' ) == 'optional' )
+				{
+					$birthday_months[NULL] = '---';
+				}
+				foreach( $month as $key => $value )
+				{
+					if( $key == '00' )
+					{
+						continue;
+					}
+					$birthday_months[(int) $key] = $value;
+				}
+				$Form->select_input_array( 'edited_user_birthday_month', $edited_User->birthday_month, $birthday_months, '', '', array( 'force_keys_as_values' => true ) );
+			}
+
+			if( $Settings->get( 'birthday_day' ) != 'hidden' )
+			{
+				$birthday_days = range( 1, 31 );
+				if( $Settings->get( 'birthday_day' ) == 'optional' )
+				{
+					$birthday_days = array( NULL => '---' ) + $birthday_days;
+				}
+				$Form->select_input_array( 'edited_user_birthday_day', $edited_User->birthday_day, $birthday_days, '' );
+			}
+
+			if( $Settings->get( 'birthday_year' ) != 'hidden' )
+			{
+				$birthday_years = range( (int) date( 'Y' ), 1900, -1 );
+				if( $Settings->get( 'birthday_year' ) == 'optional' )
+				{
+					$birthday_years = array( NULL => '---' ) + $birthday_years;
+				}
+				$Form->select_input_array( 'edited_user_birthday_year', $edited_User->birthday_year, $birthday_years, '' );
+			}
+		$Form->end_line();
+	}
 
 	// Organization select fields:
 	$OrganizationCache = & get_OrganizationCache();
@@ -549,8 +595,23 @@ $Form->end_fieldset();
 if( empty( $edited_User->ID ) && $action != 'view' )
 {	// Display password fields for new creating user:
 	$Form->begin_fieldset( T_('Password') );
+		$Form->radio( 'init_pass', param( 'init_pass', 'string', 'user' ), array(
+					array( 'user', T_('User must initialize') ),
+					array( 'admin', T_('Initialize as below:') ),
+			 ), T_('Initial password'), true );
 		$Form->password_input( 'edited_user_pass1', '', 20, T_('New password'), array( 'maxlength' => 50, 'autocomplete'=>'off' ) );
 		$Form->password_input( 'edited_user_pass2', '', 20, T_('Confirm new password'), array( 'note'=>sprintf( T_('Minimum length: %d characters.'), $Settings->get('user_minpwdlen') ), 'maxlength' => 50, 'autocomplete'=>'off' ) );
+		$Form->checkbox( 'send_pass_email', param( 'send_pass_email', 'integer', 1 ), T_('Send email'), T_('Inform user by email') );
+?>
+<script>
+function new_user_pass_visibility()
+{
+	jQuery( '#ffield_edited_user_pass1, #ffield_edited_user_pass2' ).toggle( jQuery( 'input[name=init_pass]:checked' ).val() == 'admin' );
+}
+jQuery( 'input[name=init_pass]' ).click( new_user_pass_visibility );
+new_user_pass_visibility();
+</script>
+<?php
 	$Form->end_fieldset();
 }
 
@@ -591,10 +652,10 @@ else
 
 // -------------------  Get existing userfields: -------------------------------
 $userfields = $DB->get_results( '
-SELECT ufdf_ID, uf_ID, ufdf_type, ufdf_code, ufdf_name, ufdf_icon_name, uf_varchar, ufdf_required, ufdf_options, ufgp_order, ufdf_order, ufdf_suggest, ufdf_duplicated, ufgp_ID, ufgp_name
+SELECT ufdf_ID, uf_ID, ufdf_type, ufdf_code, ufdf_name, ufdf_icon_name, uf_varchar, ufdf_required, ufdf_visibility, ufdf_options, ufgp_order, ufdf_order, ufdf_suggest, ufdf_duplicated, ufgp_ID, ufgp_name
 FROM
 	(
-		SELECT ufdf_ID, uf_ID, ufdf_type, ufdf_code, ufdf_name, ufdf_icon_name, uf_varchar, ufdf_required, ufdf_options, ufgp_order, ufdf_order, ufdf_suggest, ufdf_duplicated, ufgp_ID, ufgp_name
+		SELECT ufdf_ID, uf_ID, ufdf_type, ufdf_code, ufdf_name, ufdf_icon_name, uf_varchar, ufdf_required, ufdf_visibility, ufdf_options, ufgp_order, ufdf_order, ufdf_suggest, ufdf_duplicated, ufgp_ID, ufgp_name
 			FROM T_users__fields
 				LEFT JOIN T_users__fielddefs ON uf_ufdf_ID = ufdf_ID
 				LEFT JOIN T_users__fieldgroups ON ufdf_ufgp_ID = ufgp_ID
@@ -602,7 +663,7 @@ FROM
 
 		UNION
 
-		SELECT ufdf_ID, "0" AS uf_ID, ufdf_type, ufdf_code, ufdf_name, ufdf_icon_name, "" AS uf_varchar, ufdf_required, ufdf_options, ufgp_order, ufdf_order, ufdf_suggest, ufdf_duplicated, ufgp_ID, ufgp_name
+		SELECT ufdf_ID, "0" AS uf_ID, ufdf_type, ufdf_code, ufdf_name, ufdf_icon_name, "" AS uf_varchar, ufdf_required, ufdf_visibility, ufdf_options, ufgp_order, ufdf_order, ufdf_suggest, ufdf_duplicated, ufgp_ID, ufgp_name
 			FROM T_users__fielddefs
 				LEFT JOIN T_users__fieldgroups ON ufdf_ufgp_ID = ufgp_ID
 		WHERE ufdf_required IN ( "recommended", "require" )
@@ -610,7 +671,7 @@ FROM
 	) tfields
 ORDER BY ufgp_order, ufdf_order, uf_ID' );
 
-userfields_display( $userfields, $Form );
+userfields_display( $userfields, $Form, 'new', true, $user_id );
 
 if( $action != 'view' )
 {	// Edit mode
@@ -627,12 +688,12 @@ $Form->begin_fieldset( T_('Add new fields').( is_admin_page() ? get_manual_link(
 			foreach( $add_field_types as $add_field_type )
 			{	// We use "foreach" because sometimes the user adds several fields with the same type
 				$userfields = $DB->get_results( '
-				SELECT ufdf_ID, "0" AS uf_ID, ufdf_type, ufdf_code, ufdf_name, ufdf_icon_name, "" AS uf_varchar, ufdf_required, ufdf_options, ufdf_suggest, ufdf_duplicated, ufgp_ID, ufgp_name
+				SELECT ufdf_ID, "0" AS uf_ID, ufdf_type, ufdf_code, ufdf_name, ufdf_icon_name, "" AS uf_varchar, ufdf_required, ufdf_visibility, ufdf_options, ufdf_suggest, ufdf_duplicated, ufgp_ID, ufgp_name
 					FROM T_users__fielddefs
 						LEFT JOIN T_users__fieldgroups ON ufdf_ufgp_ID = ufgp_ID
 				WHERE ufdf_ID = '.intval( $add_field_type ) );
 
-				userfields_display( $userfields, $Form, 'add', false );
+				userfields_display( $userfields, $Form, 'add', false, $user_id );
 			}
 		}
 	}

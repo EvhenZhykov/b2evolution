@@ -13,9 +13,10 @@
 
 if( !defined('EVO_MAIN_INIT') ) die( 'Please, do not access this page directly.' );
 
+load_class( '_core/ui/_table.class.php', 'Table' );
 load_class( 'items/model/_itemtype.class.php', 'ItemType' );
 
-global $edited_Itemtype, $thumbnail_sizes, $admin_url;
+global $edited_Itemtype, $thumbnail_sizes, $admin_url, $Blog, $current_User;
 
 // Determine if we are creating or updating...
 global $action;
@@ -23,6 +24,12 @@ global $action;
 $creating = is_create_action( $action );
 
 $Form = new Form( NULL, 'itemtype_checkchanges' );
+
+$front_order_params = array(
+		'type' => 'number',
+		'min'  => -32768,
+		'max'  => 32767,
+	);
 
 if( $edited_Itemtype->ID > 0 )
 {
@@ -50,23 +57,43 @@ $Form->begin_fieldset( T_('General').get_manual_link('item-type-general') );
 	$Form->text_input( 'ityp_name', $edited_Itemtype->name, 50, T_('Name'), '', array( 'maxlength' => 30, 'required' => true ) );
 
 	$Form->textarea_input( 'ityp_description', $edited_Itemtype->description, 2, T_('Description'), array( 'cols' => 47 ) );
+
 	$Form->radio( 'ityp_perm_level', $edited_Itemtype->perm_level, array(
 			array( 'standard',   T_('Standard') ),
 			array( 'restricted', T_('Restricted') ),
 			array( 'admin',      T_('Admin') )
 		), T_('Permission level') );
-	$Form->text_input( 'ityp_template_name', $edited_Itemtype->template_name, 25, T_('Template name'), T_('b2evolution will automatically append .main.php or .disp.php'), array( 'maxlength' => 40 ) );
 
+	// Quick Templates:
+	$context = 'item_content';
+	$TemplateCache = & get_TemplateCache();
+	$TemplateCache->load_by_context( $context );
+	$template_options = array( NULL => sprintf( T_('Use PHP %s'), '(_item_content.inc.php)' ) ) + $TemplateCache->get_code_option_array();
+	$template_input_suffix = ( $current_User->check_perm( 'options', 'edit' ) ? '&nbsp;'
+		.action_icon( '', 'edit', $admin_url.'?ctrl=templates&amp;context='.$context.'&amp;blog='.$Blog->ID, NULL, NULL, NULL, array( 'onclick' => 'return b2template_list_highlight( this )' ), array( 'title' => T_('Manage templates').'...' ) ) : '' );
+	$Form->select_input_array( 'ityp_template_excerpt', $edited_Itemtype->get( 'template_excerpt' ), $template_options, T_('Template for Excerpt display'), NULL, array( 'input_suffix' => $template_input_suffix ) );
+	$Form->select_input_array( 'ityp_template_normal', $edited_Itemtype->get( 'template_normal' ), $template_options, T_('Template for Teaser display'), NULL, array( 'input_suffix' => $template_input_suffix ) );
+	$Form->select_input_array( 'ityp_template_full', $edited_Itemtype->get( 'template_full' ), $template_options, T_('Template for Full content display'), NULL, array( 'input_suffix' => $template_input_suffix ) );
+
+	// PHP Template:
+	$Form->text_input( 'ityp_template_name', $edited_Itemtype->template_name, 25, T_('PHP Template name'), T_('b2evolution will automatically append .main.php or .disp.php'), array( 'maxlength' => 40 ) );
+
+$Form->end_fieldset();
+
+$Form->begin_fieldset( T_('Structured Data').get_manual_link( 'item-type-structured-data' ) );
+	$Form->select_input_array( 'ityp_schema', $edited_Itemtype->get( 'schema' ), ityp_schema_titles( true, true ), T_('Schema'), '', array( 'force_keys_as_values' => true ) );
+	$Form->checkbox( 'ityp_add_aggregate_rating', $edited_Itemtype->add_aggregate_rating, '', T_('Add Aggregate Rating') );
 $Form->end_fieldset();
 
 $Form->begin_fieldset( T_('Use of Instructions').get_manual_link( 'item-type-instructions' ), array( 'id' => 'itemtype_instructions' ) );
 	$Form->text_input( 'ityp_evobar_link_text', $edited_Itemtype->evobar_link_text, 25, T_('New Item link in evobar'), T_('Leave empty for default') );
 	$Form->text_input( 'ityp_skin_btn_text', $edited_Itemtype->skin_btn_text, 25, T_('New Item button in skin'), T_('Leave empty for default') );
 	$Form->checklist( array(
-		array( 'ityp_front_instruction', 1, T_('In front-office edit screen'),$edited_Itemtype->front_instruction ),
 		array( 'ityp_back_instruction', 1, T_('In back-office edit screen'), $edited_Itemtype->back_instruction )
 	), 'ityp_instruction_enable', T_('Display instructions') );
 	$Form->textarea_input( 'ityp_instruction', $edited_Itemtype->instruction, 5, T_('Instructions'), array( 'cols' => 47 ) );
+	$Form->text_input( 'ityp_front_order_instruction', $edited_Itemtype->front_order_instruction, 6, T_('Front-Office Order'), T_('Leave empty to hide'), $front_order_params );
+	$Form->textarea_input( 'ityp_text_template', $edited_Itemtype->text_template, 5, T_('Template'), array( 'cols' => 47 ) );
 $Form->end_fieldset();
 
 $options = array(
@@ -80,22 +107,54 @@ $intro_type_disabled = $edited_Itemtype->is_intro();
 $intro_type_note = $intro_type_disabled ? T_('This feature is not compatible with Intro posts.') : '';
 
 $Form->begin_fieldset( T_('Features').get_manual_link( 'item-type-features' ), array( 'id' => 'itemtype_features' ) );
-	$Form->radio( 'ityp_use_short_title', $edited_Itemtype->use_short_title, array(
-			array( 'optional', T_('Optional') ),
-			array( 'never', T_('Never') ),
-		), T_('Use short title') );
-	$Form->radio( 'ityp_use_title', $edited_Itemtype->use_title, $options, T_('Use title') );
-	$Form->radio( 'ityp_use_text', $edited_Itemtype->use_text, $options, T_('Use text') );
+	$Form->begin_line( T_('Use short title') );
+		$Form->radio( 'ityp_use_short_title', $edited_Itemtype->use_short_title, array(
+				array( 'optional', T_('Optional') ),
+				array( 'never', T_('Never') ),
+		) );
+		$Form->text_input( 'ityp_short_title_maxlen', $edited_Itemtype->short_title_maxlen, 3, '&nbsp;<b>'.T_('Max. length').':</b>', '', array(
+				'type' => 'number',
+				'min' => 1,
+				'max' => 50,
+			) );
+		$Form->text_input( 'ityp_front_order_short_title', $edited_Itemtype->front_order_short_title, 6, ' &nbsp; <b>'.T_('Front-Office Order').':</b>', T_('Leave empty to hide'), $front_order_params );
+	$Form->end_line();
+	$Form->begin_line( T_('Use title') );
+		$Form->radio( 'ityp_use_title', $edited_Itemtype->use_title, $options );
+		$Form->text_input( 'ityp_title_maxlen', $edited_Itemtype->title_maxlen, 3, '&nbsp;<b>'.T_('Max. length').':</b>', '', array(
+				'type' => 'number',
+				'min' => 1,
+				'max' => 255,
+			) );
+		$Form->text_input( 'ityp_front_order_title', $edited_Itemtype->front_order_title, 6, ' &nbsp; <b>'.T_('Front-Office Order').':</b>', T_('Leave empty to hide'), $front_order_params );
+	$Form->end_line();
+	$Form->begin_line( T_('Use text') );
+		$Form->radio( 'ityp_use_text', $edited_Itemtype->use_text, $options );
+		$Form->text_input( 'ityp_front_order_text', $edited_Itemtype->front_order_text, 6, ' &nbsp; <b>'.T_('Front-Office Order').':</b>', T_('Leave empty to hide'), $front_order_params );
+	$Form->end_line();
 	$Form->checkbox( 'ityp_allow_html', $edited_Itemtype->allow_html, T_('Allow HTML'), T_( 'Check to allow HTML in posts.' ).' ('.T_('HTML code will pass several sanitization filters.').')' );
 	$Form->checkbox( 'ityp_allow_breaks', $edited_Itemtype->allow_breaks, T_('Allow Teaser and Page breaks'), $intro_type_note, '', 1, $intro_type_disabled );
-	$Form->checkbox( 'ityp_allow_attachments', $edited_Itemtype->allow_attachments, T_('Allow attachments') );
+	$Form->begin_line( T_('Allow attachments') );
+		$Form->checkbox( 'ityp_allow_attachments', $edited_Itemtype->allow_attachments );
+		$Form->text_input( 'ityp_front_order_attachments', $edited_Itemtype->front_order_attachments, 6, ' &nbsp; <b>'.T_('Front-Office Order').':</b>', T_('Leave empty to hide'), $front_order_params );
+	$Form->end_line();
 	$Form->checkbox( 'ityp_allow_featured', $edited_Itemtype->allow_featured, T_('Allow featured'), $intro_type_note, '', 1, $intro_type_disabled );
+	$Form->checkbox( 'ityp_allow_switchable', $edited_Itemtype->allow_switchable, T_('Allow switchable'), T_('Check to allow dinamically switchable blocks inside the content'), '', 1 );
 $Form->end_fieldset();
 
 $Form->begin_fieldset( T_('Use of Advanced Properties').get_manual_link( 'item-type-advanced-properties' ), array( 'id' => 'itemtype_advprops' ) );
-	$Form->radio( 'ityp_use_tags', $edited_Itemtype->use_tags, $options, T_('Use tags') );
-	$Form->radio( 'ityp_use_excerpt', $edited_Itemtype->use_excerpt, $options, T_('Use excerpt') );
-	$Form->radio( 'ityp_use_url', $edited_Itemtype->use_url, $options, T_('Use URL') );
+	$Form->begin_line( T_('Use tags') );
+		$Form->radio( 'ityp_use_tags', $edited_Itemtype->use_tags, $options );
+		$Form->text_input( 'ityp_front_order_tags', $edited_Itemtype->front_order_tags, 6, ' &nbsp; <b>'.T_('Front-Office Order').':</b>', T_('Leave empty to hide'), $front_order_params );
+	$Form->end_line();
+	$Form->begin_line( T_('Use excerpt') );
+		$Form->radio( 'ityp_use_excerpt', $edited_Itemtype->use_excerpt, $options );
+		$Form->text_input( 'ityp_front_order_excerpt', $edited_Itemtype->front_order_excerpt, 6, ' &nbsp; <b>'.T_('Front-Office Order').':</b>', T_('Leave empty to hide'), $front_order_params );
+	$Form->end_line();
+	$Form->begin_line( T_('Use URL') );
+		$Form->radio( 'ityp_use_url', $edited_Itemtype->use_url, $options );
+		$Form->text_input( 'ityp_front_order_url', $edited_Itemtype->front_order_url, 6, ' &nbsp; <b>'.T_('Front-Office Order').':</b>', T_('Leave empty to hide'), $front_order_params );
+	$Form->end_line();
 	$Form->checkbox( 'ityp_podcast', $edited_Itemtype->podcast, '', T_('Treat as Podcast Media') );
 	$Form->radio( 'ityp_use_parent', $edited_Itemtype->use_parent, $options, T_('Use Parent ID') );
 	$Form->radio( 'ityp_use_title_tag', $edited_Itemtype->use_title_tag, $options, htmlspecialchars( T_('Use <title> tag') ) );
@@ -104,7 +163,10 @@ $Form->begin_fieldset( T_('Use of Advanced Properties').get_manual_link( 'item-t
 $Form->end_fieldset();
 
 $Form->begin_fieldset( T_('Use of Location').get_manual_link( 'item-type-location' ), array( 'id' => 'itemtype_location' ) );
-	$Form->radio( 'ityp_use_country', $edited_Itemtype->use_country, $options, T_('Use country') );
+	$Form->begin_line( T_('Use country') );
+		$Form->radio( 'ityp_use_country', $edited_Itemtype->use_country, $options );
+		$Form->text_input( 'ityp_front_order_location', $edited_Itemtype->front_order_location, 6, ' &nbsp; <b>'.T_('Front-Office Order').':</b>', T_('Leave empty to hide'), $front_order_params );
+	$Form->end_line();
 	$Form->radio( 'ityp_use_region', $edited_Itemtype->use_region, $options, T_('Use region') );
 	$Form->radio( 'ityp_use_sub_region', $edited_Itemtype->use_sub_region, $options, T_('Use sub-region') );
 	$Form->radio( 'ityp_use_city', $edited_Itemtype->use_city, $options, T_('Use city') );
@@ -126,14 +188,13 @@ $Table->title = T_('Custom Fields').get_manual_link( 'item-type-custom-fields' )
 
 $Table->cols = array(
 	array( 'th' => T_('Order'), 'th_class' => 'shrinkwrap' ),
-	array( 'th' => T_('Title') ),
+	array( 'th' => T_('Label') ),
 	array( 'th' => T_('Name'), 'th_class' => 'shrinkwrap' ),
 	array( 'th' => T_('Type'), 'th_class' => 'shrinkwrap' ),
 	array( 'th' => T_('Format'), 'th_class' => 'shrinkwrap' ),
+	array( 'th' => T_('Required'), 'td_class' => 'shrinkwrap' ),
+	array( 'th' => T_('With MC'), 'th_class' => 'shrinkwrap', 'td_class' => 'shrinkwrap' ),
 	array( 'th' => T_('Public'), 'td_class' => 'shrinkwrap' ),
-	array( 'th' => T_('Line highlight'), 'th_class' => 'shrinkwrap' ),
-	array( 'th' => T_('Green highlight'), 'th_class' => 'shrinkwrap' ),
-	array( 'th' => T_('Red highlight'), 'th_class' => 'shrinkwrap' ),
 	array( 'th' => T_('Actions'), 'td_class' => 'shrinkwrap' ),
 );
 
@@ -199,15 +260,20 @@ $Table->display_line_start();
 $Table->display_col_start();
 echo '<input type="text" name="cf_order$cf_num$" value="$cf_order$" class="form_text_input form-control custom_field_order" maxlength="11" size="3" />';
 // Hidden options which are stored in DB or used as additional data:
+echo '<input type="hidden" name="cf_schema_prop$cf_num$" value="$cf_schema_prop$" />';
 echo '<input type="hidden" name="cf_ID$cf_num$" value="$cf_ID$" />';
 echo '<input type="hidden" name="cf_type$cf_num$" value="$cf_type$" />';
 echo '<input type="hidden" name="cf_note$cf_num$" value="$cf_note$" />';
 custom_field_edit_form_template( '<input type="hidden" name="cf_formula$cf_num$" value="$cf_formula$" />', 'computed', $custom_field_templates );
+echo '<input type="hidden" name="cf_disp_condition$cf_num$" value="$cf_disp_condition$" />';
 echo '<input type="hidden" name="cf_header_class$cf_num$" value="$cf_header_class$" />';
 custom_field_edit_form_template( '<input type="hidden" name="cf_cell_class$cf_num$" value="$cf_cell_class$" />', '-separator', $custom_field_templates );
 custom_field_edit_form_template( '<input type="hidden" name="cf_link$cf_num$" value="$cf_link$" />'
 	.'<input type="hidden" name="cf_link_nofollow$cf_num$" value="$cf_link_nofollow$" />'
 	.'<input type="hidden" name="cf_link_class$cf_num$" value="$cf_link_class$" />', '-text,-html,-separator', $custom_field_templates );
+custom_field_edit_form_template( '<input type="hidden" name="cf_line_highlight$cf_num$" value="$cf_line_highlight$" />'
+	.'<input type="hidden" name="cf_green_highlight$cf_num$" value="$cf_green_highlight$" />'
+	.'<input type="hidden" name="cf_red_highlight$cf_num$" value="$cf_red_highlight$" />', '-separator', $custom_field_templates );
 echo '<input type="hidden" name="cf_description$cf_num$" value="$cf_description$" />';
 custom_field_edit_form_template( '<input type="hidden" name="cf_merge$cf_num$" value="$cf_merge$" />', '-separator', $custom_field_templates );
 // Create this <hidden> to know this custom field is new created field:
@@ -237,30 +303,23 @@ custom_field_edit_form_template( array(
 	), array( 'double,computed,separator,url', 'image' ), $custom_field_templates );
 $Table->display_col_end();
 
+// Required
+$Table->display_col_start();
+custom_field_edit_form_template( array(
+		'<input type="checkbox" name="cf_required$cf_num$" value="1" />'
+	), array( '-computed,-separator' ), $custom_field_templates );
+$Table->display_col_end();
+
+// With MC
+$Table->display_col_start();
+custom_field_edit_form_template( array(
+		'<input type="checkbox" name="cf_meta$cf_num$" value="1" title="'.format_to_output( T_('Allow update with Internal Comment'), 'htmlattr' ).'" />'
+	), array( '-computed,-separator' ), $custom_field_templates );
+$Table->display_col_end();
+
 // Public
 $Table->display_col_start();
 echo '<input type="checkbox" name="cf_public$cf_num$" value="1" />';
-$Table->display_col_end();
-
-// Line highlight
-$Table->display_col_start();
-custom_field_edit_form_template( '<select name="cf_line_highlight$cf_num$" class="form-control custom_field_line_highlight">'
-		.Form::get_select_options_string( get_item_type_field_highlight_options( 'line' ), NULL, true )
-	.'</select>', '-separator', $custom_field_templates );
-$Table->display_col_end();
-
-// Green highlight
-$Table->display_col_start();
-custom_field_edit_form_template( '<select name="cf_green_highlight$cf_num$" class="form-control custom_field_green_highlight">'
-		.Form::get_select_options_string( get_item_type_field_highlight_options( 'green' ), NULL, true )
-	.'</select>', '-separator', $custom_field_templates );
-$Table->display_col_end();
-
-// Red highlight
-$Table->display_col_start();
-custom_field_edit_form_template( '<select name="cf_red_highlight$cf_num$" class="form-control custom_field_red_highlight">'
-		.Form::get_select_options_string( get_item_type_field_highlight_options( 'red' ), NULL, true )
-	.'</select>', '-separator', $custom_field_templates );
 $Table->display_col_end();
 
 // Actions
@@ -308,7 +367,15 @@ foreach( $custom_fields as $custom_field )
 	{ // Get i from this temp number when form was is submitted
 		$i = $custom_field['temp_i'];
 	}
-	$custom_ID = $custom_field['ID'];
+	if( empty( $edited_Itemtype->ID ) )
+	{	// For copied Item Type we should reset ID of existing custom field to what we generete by JS code on insert new custom field row:
+		$custom_ID = generate_random_key( 32, 'abcdef0123456789' );
+		$custom_ID[8] = $custom_ID[13] = $custom_ID[18] = $custom_ID[23] = '-';
+	}
+	else
+	{	// Use ID of existing custom field:
+		$custom_ID = $custom_field['ID'];
+	}
 	if( !empty( $deleted_custom_fields ) && ( strpos( $deleted_custom_fields, $custom_ID ) !== false ) )
 	{
 		continue;
@@ -357,21 +424,26 @@ foreach( $custom_fields as $custom_field )
 	// Replace masks with values of the custom field:
 	$cf_input_replacements = array(
 		'$cf_ID$'            => $custom_ID,
-		'$cf_new$'           => ( isset( $custom_fields_data->{'new'.$i} ) ? $custom_fields_data->{'new'.$i} : 0 ),
+		'$cf_new$'           => ( isset( $custom_fields_data->{'new'.$i} ) || empty( $edited_Itemtype->ID )/* Force on copying Item Type */ ? 1 : 0 ),
 		'$cf_num$'           => $i,
 		'$cf_type$'          => format_to_output( $custom_field['type'], 'htmlattr' ),
 		'$cf_order$'         => format_to_output( $custom_field['order'], 'htmlattr' ),
 		'$cf_label$'         => format_to_output( $custom_field['label'], 'htmlattr' ),
 		'$cf_name$'          => format_to_output( $custom_field_name, 'htmlattr' ),
+		'$cf_schema_prop$'   => format_to_output( $custom_field['schema_prop'], 'htmlattr' ),
 		'$cf_label_class$'   => $custom_field_label_class,
 		'$cf_name_class$'    => $custom_field_name_class,
 		'$cf_format$'        => format_to_output( $custom_field['format'], 'htmlattr' ),
 		'$cf_formula$'       => format_to_output( $custom_field['formula'], 'htmlattr' ),
+		'$cf_disp_condition$'=> format_to_output( $custom_field['disp_condition'], 'htmlattr' ),
 		'$cf_header_class$'  => format_to_output( $custom_field['header_class'], 'htmlattr' ),
 		'$cf_cell_class$'    => format_to_output( $custom_field['cell_class'], 'htmlattr' ),
 		'$cf_link$'          => format_to_output( $custom_field['link'], 'htmlattr' ),
 		'$cf_link_nofollow$' => format_to_output( $custom_field['link_nofollow'], 'htmlattr' ),
 		'$cf_link_class$'    => format_to_output( $custom_field['link_class'], 'htmlattr' ),
+		'$cf_line_highlight$'=> format_to_output( $custom_field['line_highlight'], 'htmlattr' ),
+		'$cf_green_highlight$'=>format_to_output( $custom_field['green_highlight'], 'htmlattr' ),
+		'$cf_red_highlight$' => format_to_output( $custom_field['red_highlight'], 'htmlattr' ),
 		'$cf_note$'          => format_to_output( $custom_field['note'], 'htmlattr' ),
 		'$cf_description$'   => format_to_output( $custom_field['description'], 'htmlspecialchars' ),
 		'$cf_merge$'         => format_to_output( $custom_field['merge'], 'htmlattr' ),
@@ -382,8 +454,16 @@ foreach( $custom_fields as $custom_field )
 	{	// Set a selected option:
 		$custom_field_type_template = preg_replace( '/(<select[^>]+name="cf_'.$cf_select_field.'.+<option value="'.preg_quote( $custom_field[ $cf_select_field ], '/' ).'")/', '$1 selected="selected"', $custom_field_type_template );
 	}
-	if( $custom_field[ 'public' ] )
-	{	// Enabled public option:
+	if( $custom_field['required'] )
+	{	// Enabled "required" option:
+		$custom_field_type_template = preg_replace( '/(<input type="checkbox"[^>]+name="cf_required[^"]+")/', '$1 checked="checked"', $custom_field_type_template );
+	}
+	if( $custom_field['meta'] )
+	{	// Enabled "meta" option:
+		$custom_field_type_template = preg_replace( '/(<input type="checkbox"[^>]+name="cf_meta[^"]+")/', '$1 checked="checked"', $custom_field_type_template );
+	}
+	if( $custom_field['public'] )
+	{	// Enabled "public" option:
 		$custom_field_type_template = preg_replace( '/(<input type="checkbox"[^>]+name="cf_public[^"]+")/', '$1 checked="checked"', $custom_field_type_template );
 	}
 	echo $custom_field_type_template;
@@ -410,12 +490,15 @@ $add_custom_fields_button = '<div class="btn-group dropdown" id="add_custom_fiel
 $add_custom_fields_button .= '</ul></div>';
 $Form->info_field( T_('Add new field of type'), $add_custom_fields_button, array( 'class' => 'info_full_height' ) );
 
+// On duplicate mode we should use ID of the copying Item Type in order to select proper Item Statuses:
+$current_ityp_ID = ( empty( $edited_Itemtype->ID ) ? get_param( 'ityp_ID' ) : $edited_Itemtype->ID );
+
 // Add fields from another item type:
 $SQL = new SQL( 'Get Item Types with custom fields' );
 $SQL->SELECT( 'ityp_ID, ityp_name' );
 $SQL->FROM( 'T_items__type' );
 $SQL->FROM_add( 'INNER JOIN T_items__type_custom_field ON itcf_ityp_ID = ityp_ID' );
-$SQL->WHERE( 'ityp_ID != '.$DB->quote( $edited_Itemtype->ID ) );
+$SQL->WHERE( 'ityp_ID != '.$DB->quote( $current_ityp_ID ) );
 $SQL->GROUP_BY( 'ityp_ID' );
 $SQL->ORDER_BY( 'ityp_name' );
 $item_type_with_custom_fields = $DB->get_assoc( $SQL );
@@ -432,13 +515,13 @@ echo '</div>';
 
 // Item Statuses allowed for the editing Item Type:
 $SQL = new SQL();
-if( $edited_Itemtype->ID )
+if( $current_ityp_ID )
 {
 	$SQL->SELECT( 'pst_ID, pst_name, its_ityp_ID' );
 	$SQL->FROM( 'T_items__status' );
 	$SQL->FROM_add( 'JOIN T_items__type' );
 	$SQL->FROM_add( 'LEFT JOIN T_items__status_type ON its_ityp_ID = ityp_ID AND its_pst_ID = pst_ID' );
-	$SQL->WHERE( 'ityp_ID = '.$edited_Itemtype->ID );
+	$SQL->WHERE( 'ityp_ID = '.$current_ityp_ID );
 }
 else
 {
@@ -500,7 +583,7 @@ $Results->cols[] = array(
 	);
 
 $display_params = array(
-		'page_url' => $admin_url.'?ctrl=itemtypes&ityp_ID='.$edited_Itemtype->ID.'&action=edit'
+		'page_url' => $admin_url.'?ctrl=itemtypes&ityp_ID='.$current_ityp_ID.'&action=edit'
 	);
 
 $Results->checkbox_toggle_selectors = 'input[name^=status_]:checkbox';
@@ -552,18 +635,22 @@ function add_new_custom_field( type, duplicated_field_obj, duplicated_field_data
 	// Set values:
 	var field_value_label = '';
 	var field_value_name = '';
+	var field_value_schema_prop = '';
 	var field_value_order = '';
 	var field_value_note = '';
 	var field_value_format = '';
 	var field_value_formula = '';
+	var field_value_disp_condition = '';
 	var field_value_header_class = ( type == 'separator' ? 'left' : 'right' ) + ' nowrap';
 	var field_value_cell_class = ( type == 'double' || type == 'computed' ) ? 'right' : ( type == 'separator' ? '' : 'center' );
 	var field_value_link = 'nolink';
 	var field_value_link_nofollow = 0;
 	var field_value_link_class = '';
-	var field_value_line_highlight = '';
-	var field_value_green_highlight = '';
-	var field_value_red_highlight = '';
+	var field_value_line_highlight = 'never';
+	var field_value_green_highlight = 'never';
+	var field_value_red_highlight = 'never';
+	var field_value_required = '';
+	var field_value_meta = '';
 	var field_value_public = '';
 	var field_value_description = '';
 	var field_value_merge = '';
@@ -577,18 +664,22 @@ function add_new_custom_field( type, duplicated_field_obj, duplicated_field_data
 		duplicated_count_custom_field++;
 		field_value_label = duplicated_field_obj.find( 'input[name^="cf_label"]' ).val();
 		field_value_name = duplicated_field_obj.find( 'input[name^="cf_name"]' ).val() + '_' + duplicated_count_custom_field;
+		field_value_schema_prop = duplicated_field_obj.find( 'input[name^="cf_schema_prop"]' ).val();
 		field_value_order = duplicated_field_obj.find( 'input[name^="cf_order"]' ).val();
 		field_value_note = duplicated_field_obj.find( 'input[name^="cf_note"]' ).val();
 		field_value_format = duplicated_field_obj.find( '[name^="cf_format"]' ).val();
 		field_value_formula = duplicated_field_obj.find( 'input[name^="cf_formula"]' ).val();
+		field_value_disp_condition = duplicated_field_obj.find( 'input[name^="cf_disp_condition"]' ).val();
 		field_value_header_class = duplicated_field_obj.find( 'input[name^="cf_header_class"]' ).val();
 		field_value_cell_class = duplicated_field_obj.find( 'input[name^="cf_cell_class"]' ).val();
 		field_value_link = duplicated_field_obj.find( 'input[name^="cf_link"]' ).val();
-		field_value_link_nofollow = duplicated_field_obj.find( 'input[name^="cf_link_nofollow"]' ).is( ':checked' );
+		field_value_link_nofollow = duplicated_field_obj.find( 'input[name^="cf_link_nofollow"]' ).val();
 		field_value_link_class = duplicated_field_obj.find( 'input[name^="cf_link_class"]' ).val();
-		field_value_line_highlight = duplicated_field_obj.find( 'select[name^="cf_line_highlight"]' ).val();
-		field_value_green_highlight = duplicated_field_obj.find( 'select[name^="cf_green_highlight"]' ).val();
-		field_value_red_highlight = duplicated_field_obj.find( 'select[name^="cf_red_highlight"]' ).val();
+		field_value_line_highlight = duplicated_field_obj.find( 'input[name^="cf_line_highlight"]' ).val();
+		field_value_green_highlight = duplicated_field_obj.find( 'input[name^="cf_green_highlight"]' ).val();
+		field_value_red_highlight = duplicated_field_obj.find( 'input[name^="cf_red_highlight"]' ).val();
+		field_value_required = duplicated_field_obj.find( 'input[name^="cf_required"]' ).is( ':checked' );
+		field_value_meta = duplicated_field_obj.find( 'input[name^="cf_meta"]' ).is( ':checked' );
 		field_value_public = duplicated_field_obj.find( 'input[name^="cf_public"]' ).is( ':checked' );
 		field_value_description = duplicated_field_obj.find( 'input[name^="cf_description"]' ).val();
 		field_value_merge = duplicated_field_obj.find( 'input[name^="cf_merge"]' ).val();
@@ -598,10 +689,12 @@ function add_new_custom_field( type, duplicated_field_obj, duplicated_field_data
 		new_field_mode = 'duplicate_from';
 		field_value_label = duplicated_field_data.data( 'label' );
 		field_value_name = duplicated_field_data.data( 'name' );
+		field_value_schema_prop = duplicated_field_data.data( 'schema_prop' );
 		field_value_order = duplicated_field_data.data( 'order' );
 		field_value_note = duplicated_field_data.data( 'note' );
 		field_value_format = duplicated_field_data.data( 'format' );
 		field_value_formula = duplicated_field_data.data( 'formula' );
+		field_value_disp_condition = duplicated_field_data.data( 'disp_condition' );
 		field_value_header_class = duplicated_field_data.data( 'header_class' );
 		field_value_cell_class = duplicated_field_data.data( 'cell_class' );
 		field_value_link = duplicated_field_data.data( 'link' );
@@ -610,6 +703,8 @@ function add_new_custom_field( type, duplicated_field_obj, duplicated_field_data
 		field_value_line_highlight = duplicated_field_data.data( 'line_highlight' );
 		field_value_green_highlight = duplicated_field_data.data( 'green_highlight' );
 		field_value_red_highlight = duplicated_field_data.data( 'red_highlight' );
+		field_value_required = duplicated_field_data.data( 'required' );
+		field_value_meta = duplicated_field_data.data( 'meta' );
 		field_value_public = duplicated_field_data.data( 'public' );
 		field_value_description = duplicated_field_data.data( 'description' );
 		field_value_merge = duplicated_field_data.data( 'merge' );
@@ -650,15 +745,20 @@ function add_new_custom_field( type, duplicated_field_obj, duplicated_field_data
 		.replace( '$cf_order$', field_value_order )
 		.replace( '$cf_label$', field_value_label )
 		.replace( '$cf_name$', field_value_name )
+		.replace( '$cf_schema_prop$', field_value_schema_prop )
 		.replace( '$cf_label_class$', 'new_custom_field_title' )
 		.replace( '$cf_name_class$', '' )
 		.replace( '$cf_format$', field_value_format )
 		.replace( '$cf_formula$', field_value_formula )
+		.replace( '$cf_disp_condition$', field_value_disp_condition )
 		.replace( '$cf_header_class$', field_value_header_class )
 		.replace( '$cf_cell_class$', field_value_cell_class )
 		.replace( '$cf_link$', field_value_link )
-		.replace( '$cf_link_nofollow$', field_value_link_nofollow ? 1 : 0 )
+		.replace( '$cf_link_nofollow$', field_value_link_nofollow )
 		.replace( '$cf_link_class$', field_value_link_class )
+		.replace( '$cf_line_highlight$', field_value_line_highlight )
+		.replace( '$cf_green_highlight$', field_value_green_highlight )
+		.replace( '$cf_red_highlight$', field_value_red_highlight )
 		.replace( '$cf_note$', field_value_note )
 		.replace( '$cf_description$', field_value_description )
 		.replace( '$cf_merge$', field_value_merge );
@@ -683,7 +783,7 @@ function add_new_custom_field( type, duplicated_field_obj, duplicated_field_data
 				custom_field_type_inputs = custom_field_type_inputs.replace( cf_field_regexp, '$1 selected="selected"' );
 			}
 		}
-		custom_field_type_inputs = custom_field_type_inputs.replace( /(<input type="checkbox"[^>]+name="cf_public[^"]+")/, '$1 checked="checked"' );
+		custom_field_type_inputs = custom_field_type_inputs.replace( /(<input type="checkbox"[^>]+name="cf_(required|meta|public)[^"]+")/, '$1 checked="checked"' );
 	}
 
 	// Insert a row of new adding field:
@@ -705,6 +805,8 @@ function add_new_custom_field( type, duplicated_field_obj, duplicated_field_data
 		new_field_obj.find( 'select[name^="cf_line_highlight"]' ).val( field_value_line_highlight );
 		new_field_obj.find( 'select[name^="cf_green_highlight"]' ).val( field_value_green_highlight );
 		new_field_obj.find( 'select[name^="cf_red_highlight"]' ).val( field_value_red_highlight );
+		new_field_obj.find( 'input[name^="cf_required"]' ).prop( 'checked', field_value_required );
+		new_field_obj.find( 'input[name^="cf_meta"]' ).prop( 'checked', field_value_meta );
 		new_field_obj.find( 'input[name^="cf_public"]' ).prop( 'checked', field_value_public );
 	}
 
@@ -891,7 +993,9 @@ jQuery( document ).on( 'submit', 'form#itemtype_select_fields', function()
 			field_row.find( 'input[name^="cf_order"]' ).val( field_data_obj.data( 'order' ) );
 			field_row.find( 'input[name^="cf_note"]' ).val( field_data_obj.data( 'note' ) );
 			field_row.find( '[name^="cf_format"]' ).val( field_data_obj.data( 'format' ) );
+			field_row.find( 'input[name^="cf_schema_prop"]' ).val( field_data_obj.data( 'schema_prop' ) );
 			field_row.find( 'input[name^="cf_formula"]' ).val( field_data_obj.data( 'formula' ) );
+			field_row.find( 'input[name^="cf_disp_condition"]' ).val( field_data_obj.data( 'disp_condition' ) );
 			field_row.find( 'input[name^="cf_header_class"]' ).val( field_data_obj.data( 'header_class' ) );
 			field_row.find( 'input[name^="cf_cell_class"]' ).val( field_data_obj.data( 'cell_class' ) );
 			field_row.find( 'input[name^="cf_link"]' ).val( field_data_obj.data( 'link' ) );
@@ -900,6 +1004,8 @@ jQuery( document ).on( 'submit', 'form#itemtype_select_fields', function()
 			field_row.find( 'select[name^="cf_line_highlight"]' ).val( field_data_obj.data( 'line_highlight' ) );
 			field_row.find( 'select[name^="cf_green_highlight"]' ).val( field_data_obj.data( 'green_highlight' ) );
 			field_row.find( 'select[name^="cf_red_highlight"]' ).val( field_data_obj.data( 'red_highlight' ) );
+			field_row.find( 'input[name^="cf_required"]' ).prop( 'checked', field_data_obj.data( 'required' ) );
+			field_row.find( 'input[name^="cf_meta"]' ).prop( 'checked', field_data_obj.data( 'meta' ) );
 			field_row.find( 'input[name^="cf_public"]' ).prop( 'checked', field_data_obj.data( 'public' ) );
 			field_row.find( 'input[name^="cf_description"]' ).val( field_data_obj.data( 'description' ) );
 			field_row.find( 'input[name^="cf_merge"]' ).val( field_data_obj.data( 'merge' ) );

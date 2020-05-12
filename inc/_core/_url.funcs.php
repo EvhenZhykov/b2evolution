@@ -7,7 +7,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}.
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}.
  * Parts of this file are copyright (c)2006 by Daniel HAHLER - {@link http://daniel.hahler.de/}.
  *
  * @package evocore
@@ -1080,5 +1080,76 @@ function url_check_same_domain( $main_url, $check_url )
 	$same_domain = ( ( $check_url_host == null ) || ( $check_url_host == $main_url_host ) );
 	// Check subdomain
 	return $same_domain || ( substr( $check_url_host, - ( strlen( $main_url_host ) + 1 ) ) == '.'.$main_url_host );
+}
+
+
+/**
+ * Get current URL
+ *
+ * @param string Exclude params separated by comma
+ * @return string
+ */
+function get_current_url( $exclude_params = NULL )
+{
+	$current_url = ( isset( $_SERVER['HTTPS'] ) && $_SERVER['HTTPS'] == 'on' ? 'https://' : 'http://' )
+		.$_SERVER['HTTP_HOST']
+		.$_SERVER['REQUEST_URI'];
+
+	if( $exclude_params !== NULL )
+	{	// Exclude params from current url:
+		$current_url = clear_url( $current_url, $exclude_params );
+	}
+
+	return $current_url;
+}
+
+
+/**
+ * Remove parameters from URL
+ *
+ * @param string Original URL
+ * @param string Parameters which should be removed from URL (separated by comma)
+ * @return string Cleared URL
+ */
+function clear_url( $url, $exclude_params )
+{
+	$exclude_params = str_replace( ',', '|', preg_quote( $exclude_params ) );
+	$url = preg_replace( '/((\?)|&(amp;)?)('.$exclude_params.')=[^&]+/i', '$2', $url );
+	return rtrim( preg_replace( '/\?(&(amp;)?)+/', '?', $url ), '?' );
+}
+
+
+/**
+ * Keep only allowed noredir params from current URL in the given URL
+ *
+ * @param string Given URL
+ * @param string Separator between URL params
+ * @return string Given URL with allowed noredir params which are found in current URL
+ */
+function url_clear_noredir_params( $url, $glue = '&' )
+{
+	global $noredir_params;
+
+	if( empty( $noredir_params ) )
+	{	// No allowed params:
+		return $url;
+	}
+
+	// Get all params from the given URL:
+	preg_match_all( '#(&(amp;)?|\?)([^=]+)=[^&]*#', $url, $url_params );
+	$url_params = isset( $url_params[3] ) ? $url_params[3] : array();
+
+	$allowed_params = array();
+	foreach( $_GET as $param => $value )
+	{	// Check each GET param:
+		if( in_array( $param, $noredir_params ) && // If param is allowed by config $noredir_params
+		    ! in_array( $param, $url_params ) ) // If param is NOT defined in the given URL yet
+		{
+			$allowed_params[ $param ] = $value;
+		}
+	}
+
+	// Append allowed params from current URL to the given URL:
+	return url_add_param( $url, $allowed_params, $glue );
 }
 ?>

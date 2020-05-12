@@ -7,7 +7,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}
  *
  * @package evocore
  */
@@ -44,6 +44,15 @@ class coll_item_list_Widget extends ComponentWidget
 	 */
 	function get_param_definitions( $params )
 	{
+		global $current_User, $admin_url;
+
+		// Get available templates:
+		$context = 'content_list_master';
+		$TemplateCache = & get_TemplateCache();
+		$TemplateCache->load_by_context( $context );
+
+		$template_options = array( NULL => T_('No template / use settings below').':' ) + $TemplateCache->get_code_option_array();
+
 		load_funcs( 'files/model/_image.funcs.php' );
 
 		/**
@@ -67,6 +76,17 @@ class coll_item_list_Widget extends ComponentWidget
 					'note' => T_('Title to display in your skin.'),
 					'size' => 60,
 					'defaultvalue' => T_('Items'),
+				),
+				'template' => array(
+					'label' => T_('Template'),
+					'type' => 'select',
+					'options' => $template_options,
+					'defaultvalue' => NULL,
+					'input_suffix' => ( is_logged_in() && $current_User->check_perm( 'options', 'edit' ) ? '&nbsp;'
+							.action_icon( '', 'edit', $admin_url.'?ctrl=templates&amp;context='.$context, NULL, NULL, NULL,
+							array( 'onclick' => 'return b2template_list_highlight( this )' ),
+							array( 'title' => T_('Manage templates').'...' ) ) : '' ),
+					'class' => 'evo_template_select',
 				),
 				'title_link' => array(
 					'label' => T_('Link to blog'),
@@ -425,13 +445,9 @@ class coll_item_list_Widget extends ComponentWidget
 		$listBlog = ( $blog_ID ? $BlogCache->get_by_ID( $blog_ID, false ) : $Blog );
 
 		if( empty( $listBlog ) )
-		{
-			echo $this->disp_params['block_start'];
-			echo $this->disp_params['block_body_start'];
-			echo T_('The requested Blog doesn\'t exist any more!');
-			echo $this->disp_params['block_body_end'];
-			echo $this->disp_params['block_end'];
-			return;
+		{	// Display error when wrong collection is requested by this widget:
+			$this->display_error_message( 'Widget "'.$this->get_name().'" is hidden because the requested Collection #'.$this->disp_params['blog_ID'].' doesn\'t exist any more.' );
+			return false;
 		}
 
 		// @var $placeholder_dimension is empty by default
@@ -450,6 +466,12 @@ class coll_item_list_Widget extends ComponentWidget
 
 		// Define default template params that can be rewritten by skin
 		$this->disp_params = array_merge( array(
+
+				// In case of cross-posting, we EXPECT to navigate in same collection if possible:
+				'target_blog'     => 'auto', 						// Stay in current collection if it is allowed for the Item
+				// 'post_navigation' => 'same_category',			// Stay in the same category if Item is cross-posted -- IN this case, we are NOT in a category
+
+				// The following are to auto-templates only:
 				'item_first_image_before'      => '<div class="item_first_image">',
 				'item_first_image_after'       => '</div>',
 				'item_first_image_placeholder' => '<div class="item_first_image_placeholder"'.$placeholder_dimension.'><a href="$item_permaurl$"></a></div>',
@@ -474,8 +496,10 @@ class coll_item_list_Widget extends ComponentWidget
 		// Note: we pass a widget specific prefix in order to make sure to never interfere with the mainlist
 		$limit = intval( $this->disp_params['limit'] );
 
-		if( $this->disp_params['disp_teaser'] )
-		{	// We want to show some of the post content, we need to load more info: use ItemList2
+		if( $this->disp_params['disp_teaser'] // We want to show some of the post content...
+			|| !empty($this->disp_params['template']) ) // We have potentially an elaborate template to display...
+		// TODO: allow "ItemLight templates"
+		{	// ... to do that, we need to load more info: use ItemList2
 			$ItemList = new ItemList2( $listBlog, $listBlog->get_timestamp_min(), $listBlog->get_timestamp_max(), $limit, 'ItemCache', $this->code.'_' );
 		}
 		else
@@ -538,12 +562,14 @@ class coll_item_list_Widget extends ComponentWidget
 
 			if( ! isset($MainList) )
 			{	// Nothing to follow, don't display anything
+				$this->display_debug_message( 'Widget "'.$this->get_name().'" is hidden because there is no MainList object.' );
 				return false;
 			}
 
 			$all_tags = $MainList->get_all_tags();
 			if( empty($all_tags) )
 			{	// Nothing to follow, don't display anything
+				$this->display_debug_message( 'Widget "'.$this->get_name().'" is hidden because there is nothing to display.' );
 				return false;
 			}
 
@@ -598,7 +624,8 @@ class coll_item_list_Widget extends ComponentWidget
 
 		if( ! $ItemList->result_num_rows )
 		{	// Nothing to display:
-			return;
+			$this->display_debug_message( 'Widget "'.$this->get_name().'" is hidden because there are no results to display.' );
+			return false;
 		}
 
 		// Check if the widget displays only single title
@@ -612,139 +639,218 @@ class coll_item_list_Widget extends ComponentWidget
 
 		// DISPLAY START:
 
-		// Start to capture display content here in order to be able to detect if the whole widget must not be displayed
-		ob_start();
-		// This variable used to display widget. Will be set to true when content is displayed
-		$content_is_displayed = false;
+		if( $this->disp_params['template'] )
+		{
+			// DSIPLAY with Quick TEMPLATE:
 
-		// Get extra classes depending on widget settings:
-		$block_css_class = $this->get_widget_extra_class();
-
-		if( empty( $block_css_class ) )
-		{	// No extra class, Display default wrapper:
 			echo $this->disp_params['block_start'];
-		}
-		else
-		{	// Append extra classes for widget block:
-			echo preg_replace( '/ class="([^"]+)"/', ' class="$1'.$block_css_class.'"', $this->disp_params['block_start'] );
-		}
 
-		$title = sprintf( ( $this->disp_params[ 'title_link' ] ? '<a href="'.$listBlog->gen_blogurl().'" rel="nofollow">%s</a>' : '%s' ), $this->disp_params[ 'title' ] );
-		$this->disp_title( $title );
+			// Block title:
+			$title = sprintf( ( $this->disp_params[ 'title_link' ] ? '<a href="'.$listBlog->gen_blogurl().'" rel="nofollow">%s</a>' : '%s' ), $this->disp_params[ 'title' ] );
+			$this->disp_title( $title );
 
-		echo $this->disp_params['block_body_start'];
-
-		if( $chapter_mode )
-		{	// List grouped by chapter/category:
-
-			$items_map_by_chapter = array();
-			$chapters_of_loaded_items = array();
-			$group_by_blogs = false;
-			$prev_chapter_blog_ID = NULL;
-
-			while( $iterator_Item = & $ItemList->get_item() )
-			{	// Display contents of the Item depending on widget params:
-				$Chapter = & $iterator_Item->get_main_Chapter();
-				if( ! isset( $items_map_by_chapter[$Chapter->ID] ) )
-				{
-					$items_map_by_chapter[$Chapter->ID] = array();
-					$chapters_of_loaded_items[] = $Chapter;
-				}
-				$items_map_by_chapter[$Chapter->ID][] = $iterator_Item;
-				// Group by blogs if there are chapters from multiple blogs
-				if( ! $group_by_blogs && ( $Chapter->blog_ID != $prev_chapter_blog_ID ) )
-				{	// group by blogs is not decided yet
-					$group_by_blogs = ( $prev_chapter_blog_ID != NULL );
-					$prev_chapter_blog_ID = $Chapter->blog_ID;
-				}
-			}
-
-			usort( $chapters_of_loaded_items, 'Chapter::compare_chapters' );
-			$displayed_blog_ID = NULL;
-
-			if( $group_by_blogs && isset( $this->disp_params['collist_start'] ) )
-			{	// Start list of blogs
-				echo $this->disp_params['collist_start'];
+			// Check if template exists:
+			$TemplateCache = & get_TemplateCache();
+			$widget_Template = $TemplateCache->get_by_code( $this->disp_params['template'], false, false );
+			if( ! $widget_Template )
+			{
+				$this->display_error_message( sprintf( 'Template not found: %s', '<code>'.$this->disp_params['template'].'</code>' ) );
 			}
 			else
-			{	// Display list start, all chapters are in the same group ( not grouped by blogs )
-				echo $this->get_layout_start();
-			}
-
-			$item_index = 0;
-			foreach( $chapters_of_loaded_items as $Chapter )
 			{
-				if( $group_by_blogs && $displayed_blog_ID != $Chapter->blog_ID )
-				{
-					$Chapter->get_Blog();
-					if( $displayed_blog_ID != NULL )
-					{	// Display the end of the previous blog's chapter list
-						echo $this->get_layout_end( $item_index );
-					}
-					echo $this->disp_params['coll_start'].$Chapter->Blog->get('shortname'). $this->disp_params['coll_end'];
-					// Display start of blog's chapter list
-					echo $this->get_layout_start();
-					$displayed_blog_ID = $Chapter->blog_ID;
+
+				echo $this->disp_params['block_body_start'];
+
+				// Render MASTER quick template:
+				// In theory, this should not display anything.
+				// Instead, this should set variables to define sub-templates (and potentially additional variables)
+				echo render_template_code( $this->disp_params['template'], /* BY REF */ $this->disp_params );
+
+				// Check if requested sub-template exists:
+				if( empty( $this->disp_params['item_template'] ) )
+				{	// Display error when no template for listing
+					$this->display_error_message( sprintf( 'Missing %s param', '<code>item_template</code>' ) );
+					return false;
 				}
-				// -------------
-				$content_is_displayed = $this->disp_chapter( $Chapter, $items_map_by_chapter, $item_index ) || $content_is_displayed;
-				// -------------
+				elseif( ! ( $item_Template = & $TemplateCache->get_by_code( $this->disp_params['item_template'], false, false ) ) )
+				{	// Display error when no or wrong template for listing
+					$this->display_error_message( sprintf( 'Template is not found: %s for listing an item', '<code>'.$this->disp_params['item_template'].'</code>' ) );
+					return false;
+				}
+				else
+				{
+					// Display list of Items:
+					if( isset( $this->disp_params['before_list'] ) )
+					{
+						echo $this->disp_params['before_list'];
+					}
+
+					// ONLY SUPPORTING Plain list: (not grouped by category) for now
+					// TODO: maybe support group by category. Use case???
+
+					$item_index = 0;
+					/**
+					 * @var ItemLight (or Item)
+					 */
+					while( $Item = & $ItemList->get_item() )
+					{
+						// Render Item by quick template:
+						echo render_template_code( $this->disp_params['item_template'], $this->disp_params, array( 'Item' => $Item ) );
+					}
+
+					// TODO: maybe support $this->disp_params['page'] & $this->disp_params['pagination'] . Use case?
+
+
+					if( isset( $this->disp_params['after_list'] ) )
+					{
+						echo $this->disp_params['after_list'];
+					}
+				}
+
+				echo $this->disp_params['block_body_end'];
 			}
 
-			if( $content_is_displayed )
-			{	// End of a chapter list - if some content was displayed this is always required
+			echo $this->disp_params['block_end'];
+		}
+		else
+		{
+			// DISPLAY with "AUTOMATIC" template:
+
+			// Start to capture display content here in order to be able to detect if the whole widget must not be displayed
+			ob_start();
+			// This variable used to display widget. Will be set to true when content is displayed
+			$content_is_displayed = false;
+
+			// Get extra classes depending on widget settings:
+			$block_css_class = $this->get_widget_extra_class();
+
+			if( empty( $block_css_class ) )
+			{	// No extra class, Display default wrapper:
+				echo $this->disp_params['block_start'];
+			}
+			else
+			{	// Append extra classes for widget block:
+				echo preg_replace( '/ class="([^"]+)"/', ' class="$1'.$block_css_class.'"', $this->disp_params['block_start'] );
+			}
+
+			$title = sprintf( ( $this->disp_params[ 'title_link' ] ? '<a href="'.$listBlog->gen_blogurl().'" rel="nofollow">%s</a>' : '%s' ), $this->disp_params[ 'title' ] );
+			$this->disp_title( $title );
+
+			echo $this->disp_params['block_body_start'];
+
+			if( $chapter_mode )
+			{	// List grouped by chapter/category:
+
+				$items_map_by_chapter = array();
+				$chapters_of_loaded_items = array();
+				$group_by_blogs = false;
+				$prev_chapter_blog_ID = NULL;
+
+				while( $iterator_Item = & $ItemList->get_item() )
+				{	// Display contents of the Item depending on widget params:
+					$Chapter = & $iterator_Item->get_main_Chapter();
+					if( ! isset( $items_map_by_chapter[$Chapter->ID] ) )
+					{
+						$items_map_by_chapter[$Chapter->ID] = array();
+						$chapters_of_loaded_items[] = $Chapter;
+					}
+					$items_map_by_chapter[$Chapter->ID][] = $iterator_Item;
+					// Group by blogs if there are chapters from multiple blogs
+					if( ! $group_by_blogs && ( $Chapter->blog_ID != $prev_chapter_blog_ID ) )
+					{	// group by blogs is not decided yet
+						$group_by_blogs = ( $prev_chapter_blog_ID != NULL );
+						$prev_chapter_blog_ID = $Chapter->blog_ID;
+					}
+				}
+
+				usort( $chapters_of_loaded_items, 'Chapter::compare_chapters' );
+				$displayed_blog_ID = NULL;
+
+				if( $group_by_blogs && isset( $this->disp_params['collist_start'] ) )
+				{	// Start list of blogs
+					echo $this->disp_params['collist_start'];
+				}
+				else
+				{	// Display list start, all chapters are in the same group ( not grouped by blogs )
+					echo $this->get_layout_start();
+				}
+
+				$item_index = 0;
+				foreach( $chapters_of_loaded_items as $Chapter )
+				{
+					if( $group_by_blogs && $displayed_blog_ID != $Chapter->blog_ID )
+					{
+						$Chapter->get_Blog();
+						if( $displayed_blog_ID != NULL )
+						{	// Display the end of the previous blog's chapter list
+							echo $this->get_layout_end( $item_index );
+						}
+						echo $this->disp_params['coll_start'].$Chapter->Blog->get('shortname'). $this->disp_params['coll_end'];
+						// Display start of blog's chapter list
+						echo $this->get_layout_start();
+						$displayed_blog_ID = $Chapter->blog_ID;
+					}
+					// -------------
+					$content_is_displayed = $this->disp_chapter( $Chapter, $items_map_by_chapter, $item_index ) || $content_is_displayed;
+					// -------------
+				}
+
+				if( $content_is_displayed )
+				{	// End of a chapter list - if some content was displayed this is always required
+					echo $this->get_layout_end( $item_index );
+				}
+
+				if( $group_by_blogs && isset( $this->disp_params['collist_end'] ) )
+				{	// End of blog list
+					echo $this->disp_params['collist_end'];
+				}
+
+			}
+			else
+			{	// Plain list: (not grouped by category)
+
+				echo $this->get_layout_start();
+
+				$item_index = 0;
+				/**
+				 * @var ItemLight (or Item)
+				 */
+				while( $Item = & $ItemList->get_item() )
+				{
+					// -------------
+					// DISPLAY CONTENT of the Item depending on widget params:
+					$content_is_displayed = $this->disp_item_contents( $Item, false, $item_index ) || $content_is_displayed;
+					// -------------
+				}
+
+				if( isset( $this->disp_params['page'] ) )
+				{
+					if( empty( $this->disp_params['pagination'] ) )
+					{
+						$this->disp_params['pagination'] = array();
+					}
+					$ItemList->page_links( $this->disp_params['pagination'] );
+				}
+
 				echo $this->get_layout_end( $item_index );
 			}
 
-			if( $group_by_blogs && isset( $this->disp_params['collist_end'] ) )
-			{	// End of blog list
-				echo $this->disp_params['collist_end'];
+
+			echo $this->disp_params['block_body_end'];
+
+			echo $this->disp_params['block_end'];
+
+			if( $content_is_displayed )
+			{	// Some content is displayed, Print out widget
+				ob_end_flush();
 			}
-
-		}
-		else
-		{	// Plain list: (not grouped by category)
-
-			echo $this->get_layout_start();
-
-			$item_index = 0;
-			/**
-			 * @var ItemLight (or Item)
-			 */
-			while( $Item = & $ItemList->get_item() )
-			{
-				// -------------
-				// DISPLAY CONTENT of the Item depending on widget params:
-				$content_is_displayed = $this->disp_item_contents( $Item, false, $item_index ) || $content_is_displayed;
-				// -------------
+			else
+			{	// No content, Don't display widget
+				ob_end_clean();
 			}
-
-			if( isset( $this->disp_params['page'] ) )
-			{
-				if( empty( $this->disp_params['pagination'] ) )
-				{
-					$this->disp_params['pagination'] = array();
-				}
-				$ItemList->page_links( $this->disp_params['pagination'] );
-			}
-
-			echo $this->get_layout_end( $item_index );
 		}
 
-
-		echo $this->disp_params['block_body_end'];
-
-		echo $this->disp_params['block_end'];
-
-		if( $content_is_displayed )
-		{	// Some content is displayed, Print out widget
-			ob_end_flush();
-		}
-		else
-		{	// No content, Don't display widget
-			ob_end_clean();
-		}
-
+		return true;
 	}
 
 
@@ -761,11 +867,11 @@ class coll_item_list_Widget extends ComponentWidget
 		$content_is_displayed = false;
 
 		if( isset( $items_map_by_chapter[$Chapter->ID] ) && ( count( $items_map_by_chapter[$Chapter->ID] ) > 0 ) )
-		{	// Display Chapter only if it has some items
+		{	// Display Chapter only if it has some items:
 			echo $this->get_layout_item_start();
 			$Chapter->get_Blog();
 			echo '<a href="'.$Chapter->get_permanent_url().'">'.$Chapter->get('name').'</a>';
-			echo $this->get_layout_item_end();
+
 			echo $this->disp_params['group_start'];
 
 			$item_index = 0;
@@ -774,8 +880,9 @@ class coll_item_list_Widget extends ComponentWidget
 				$content_is_displayed = $this->disp_item_contents( $iterator_Item, true, $item_index ) || $content_is_displayed;
 			}
 
-			// Close cat group
+			// Close category group:
 			echo $this->disp_params['group_end'];
+			echo $this->get_layout_item_end();
 		}
 
 		return $content_is_displayed;
@@ -974,6 +1081,8 @@ class coll_item_list_Widget extends ComponentWidget
 	/**
 	 * Display images of the selected item
 	 *
+	 * @todo Not sure if it makes sense that this reads attachment linklist directly
+	 *
 	 * @param array Params
 	 * @param boolean Changed by reference when content is displayed
 	 */
@@ -1090,7 +1199,7 @@ class coll_item_list_Widget extends ComponentWidget
 	 */
 	function get_widget_extra_class()
 	{
-		$block_css_class = '';
+		$block_css_class = ' widget_uil_autotemp'; // Force tagging "Universal Item List Auto Template" for simplifying backward compatibility CSS
 
 		if( ! $this->disp_params['disp_title'] && in_array( $this->disp_params[ 'attached_pics' ], array( 'first', 'all' ) ) )
 		{	// Don't display bullets when we show only the pictures:

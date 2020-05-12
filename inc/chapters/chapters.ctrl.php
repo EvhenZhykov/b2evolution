@@ -7,7 +7,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}
  *
  * @package admin
  */
@@ -504,8 +504,13 @@ switch( $action )
 }
 
 if( $action == 'list' )
-{ // Load JS to edit chapter order inline
+{	// Load JS to edit chapter order inline
 	require_js( 'jquery/jquery.jeditable.js', 'rsc_url' );
+}
+
+if( in_array( $action, array( 'list', 'edit', 'move' ) ) )
+{	// Initialize Hotkeys:
+	init_hotkeys_js();
 }
 
 /**

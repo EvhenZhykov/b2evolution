@@ -7,7 +7,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}.
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}.
  *
  * @package admin
  */
@@ -133,7 +133,11 @@ $Form->hidden( 'from', 'backoffice' );
 			$Form->email_input( 'newcomment_author_email', $edited_Comment->author_email, 20, T_('Email'), array( 'maxlength' => 255, 'style' => 'width:100%' ) );
 			$Form->checkbox( 'comment_allow_msgform', $edited_Comment->allow_msgform, T_('Allow contact'), T_('If checked, the comment author can be contacted through a form that will send him an email.') );
 			$Form->checkbox( 'comment_anon_notify', $edited_Comment->anon_notify, T_('Notify me of replies') );
-			$Form->text_input( 'newcomment_author_url', $edited_Comment->author_url, 20, T_('Website URL'), '', array( 'maxlength' => 255, 'style' => 'width:100%' ) );
+			$Form->text_input( 'newcomment_author_url', $edited_Comment->author_url, 20, T_('Website URL'),
+				'<label><input type="checkbox" name="comment_author_url_nofollow" value="1"'.( $edited_Comment->author_url_nofollow ? ' checked="checked"' : '' ).' /> Nofollow</label> &nbsp; '.
+				'<label><input type="checkbox" name="comment_author_url_ugc" value="1"'.( $edited_Comment->author_url_ugc ? ' checked="checked"' : '' ).' /> UGC</label> &nbsp; '.
+				'<label><input type="checkbox" name="comment_author_url_sponsored" value="1"'.( $edited_Comment->author_url_sponsored ? ' checked="checked"' : '' ).' /> Sponsored</label>',
+				array( 'maxlength' => 255, 'style' => 'width:100%' ) );
 		}
 
 		echo '</div>';
@@ -151,7 +155,12 @@ $Form->hidden( 'from', 'backoffice' );
 	$content = $comment_content;
 	$Form->fieldstart = '<div class="edit_area">';
 	$Form->fieldend = "</div>\n";
-	$Form->textarea_input( 'content', $content, 16, '', array( 'cols' => 40 , 'id' => 'commentform_post_content', 'class' => 'autocomplete_usernames' ) );
+	$Form->textarea_input( 'content', $content, 16, '', array(
+			'cols' => 40 ,
+			'id' => 'commentform_post_content',
+			'class' => ( $edited_Comment->is_meta() || $Blog->get_setting( 'autocomplete_usernames' ) ? 'autocomplete_usernames' : '' ).' link_attachment_dropzone',
+			'maxlength' => ( $edited_Comment->is_meta() ? '' : $Blog->get_setting( 'comment_maxlen' ) ),
+		) );
 	$Form->fieldstart = '<div class="tile">';
 	$Form->fieldend = '</div>';
 	?>
@@ -237,14 +246,6 @@ $Form->hidden( 'from', 'backoffice' );
 
 		$Form->end_fieldset();
 	}
-
-	// ####################### LINKS #########################
-	$Form->begin_fieldset( T_('Links'), array( 'id' => 'cmntform_html', 'fold' => true ) );
-		echo '<p>';
-		$Form->checkbox_basic_input( 'comment_nofollow', $edited_Comment->nofollow, T_('Nofollow website URL') );
-		// TODO: apply to all links  -- note: see basic antispam plugin that does this for x hours
-		echo '</p>';
-	$Form->end_fieldset();
 
 
 	// ####################### FEEDBACK INFO #########################

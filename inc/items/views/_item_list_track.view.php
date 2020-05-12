@@ -7,7 +7,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}.
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}.
  * Parts of this file are copyright (c)2005 by Daniel HAHLER - {@link http://thequod.de/contact}.
  *
  * @package admin
@@ -43,7 +43,7 @@ else
 
 $ItemList->filter_area = array(
 		'callback' => 'callback_filter_item_list_table',
-		'hide_filter_button' => true,
+		'apply_filters_button' => 'none',
 	);
 
 
@@ -144,10 +144,6 @@ $ItemList->cols[] = array(
 		'td' => '%item_edit_actions( {Obj} )%',
 	);
 
-if( $ItemList->is_filtered() )
-{	// List is filtered, offer option to reset filters:
-	$ItemList->global_icon( T_('Reset all filters!'), 'reset_filters', '?ctrl=items&amp;blog='.$Blog->ID.'&amp;filter=reset', T_('Reset filters'), 3, 3, array( 'class' => 'action_icon btn-warning' ) );
-}
 
 if( $current_User->check_perm( 'blog_post_statuses', 'edit', false, $Blog->ID ) )
 {	// We have permission to add a post with at least one status:

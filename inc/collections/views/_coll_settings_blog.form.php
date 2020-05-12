@@ -7,7 +7,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}
  *
  * @package admin
  */
@@ -91,7 +91,11 @@ $Form->begin_fieldset( T_('Cross posting').get_manual_link('collections-cross-po
 	}
 	$Form->checkbox_input( 'redirect_moved_posts', $Settings->get( 'redirect_moved_posts' ), T_('Redirect if post has moved'), $redirect_moved_posts_params );
 
-	$Form->checkbox_input( 'always_match_slug', $Settings->get( 'always_match_slug' ), T_('Always try to match slug'), array( 'note' => T_('check to redirect to correct Collection if an Item Slug was found in <b>any</b> URL.') ) );
+	$Form->checkbox_input( 'always_match_slug', $Settings->get( 'always_match_slug' ), T_('Always try to match slug'), array( 'note' => T_('check to redirect to correct Collection if an Item Slug was found in <b>any</b> URL (including invalid URLs).') ) );
+
+	$Form->checklist( array(
+		array( 'redirect_tinyurl', 1, TB_('301 redirect to canonical URL'), $Settings->get( 'redirect_tinyurl' ) ),
+		), 'tinyurl_options', TB_('Tiny URLs') );
 $Form->end_fieldset();
 
 // --------------------------------------------
@@ -143,6 +147,40 @@ $Form->begin_fieldset( T_('Default Skins for New Collections').get_manual_link( 
 	$Form->select_input_array( 'def_normal_skin_ID', $Settings->get( 'def_normal_skin_ID' ), $normal_skins, T_('Default standard skin'), NULL, $field_params );
 	$Form->select_input_array( 'def_mobile_skin_ID', $Settings->get( 'def_mobile_skin_ID' ), $mobile_skins, T_('Default mobile phone skin'), NULL, $field_params );
 	$Form->select_input_array( 'def_tablet_skin_ID', $Settings->get( 'def_tablet_skin_ID' ), $tablet_skins, T_('Default tablet skin'), NULL, $field_params );
+$Form->end_fieldset();
+
+// --------------------------------------------
+
+$Form->begin_fieldset( T_('Default URL for New Collections').get_manual_link( 'default-url-for-new-collections' ) );
+
+	global $baseurl, $basehost, $baseprotocol, $baseport;
+	$access_type_options = array(
+		array( 'index.php', T_('Explicit param on index.php'),
+				'<code>'.$baseurl.'index.php?blog=1</code>',
+			),
+		array( 'extrabase', T_('Extra path on baseurl'),
+				'<code>'.$baseurl.'<span class="blog_url_text">urlname</span>/</code> ('.T_('Requires mod_rewrite').')',
+			),
+		array( 'extrapath', T_('Extra path on index.php'),
+				'<code>'.$baseurl.'index.php/<span class="blog_url_text">urlname</span>/</code>',
+			),
+	);
+	if( ! is_valid_ip_format( $basehost ) )
+	{	// Not an IP address, we can use subdomains:
+		$access_type_options[] = array( 'subdom', T_('Subdomain of basehost'),
+				'<code>'.$baseprotocol.'://<span class="blog_url_text">urlname</span>.'.$basehost.$baseport.'/</code>',
+			);
+	}
+	else
+	{	// Don't allow subdomain for IP address:
+		$access_type_options[] = array( 'subdom', T_('Subdomain').':',
+				sprintf( T_('(Not possible for %s)'), $basehost ),
+				'',
+				'disabled="disabled"'
+			);
+	}
+	$Form->radio( 'coll_access_type', $Settings->get( 'coll_access_type' ), $access_type_options, T_('Collection base URL'), true );
+
 $Form->end_fieldset();
 
 // --------------------------------------------

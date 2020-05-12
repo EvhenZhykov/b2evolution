@@ -9,7 +9,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}.
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}.
  *
  * @package evoskins
  */
@@ -72,7 +72,8 @@ $Form->begin_form( 'bComment' );
 	$Form->textarea_input( 'content', $comment_content, $display_params['textarea_lines'], $display_params['form_comment_text'], array(
 			'cols' => 38,
 			'class' => 'bComment autocomplete_usernames',
-			'id' => $dummy_fields[ 'content' ]
+			'id' => $dummy_fields[ 'content' ],
+			'maxlength' => $Blog->get_setting( 'comment_maxlen' ),
 		) );
 	$Form->inputstart = $form_inputstart;
 

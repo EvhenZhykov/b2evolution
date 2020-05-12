@@ -7,7 +7,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}.
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}.
  * Parts of this file are copyright (c)2004-2005 by Daniel HAHLER - {@link http://thequod.de/contact}.
  *
  * @package admin
@@ -107,14 +107,11 @@ if( $current_User->check_perm( 'blog_admin', 'edit', false, $edited_Blog->ID ) )
 {	// Permission to edit advanced admin settings
 
 	$Form->begin_fieldset( T_('Caching').get_admin_badge().get_manual_link('collection-cache-settings'), array( 'id' => 'caching' ) );
-		$ajax_enabled = $edited_Blog->get_setting( 'ajax_form_enabled' );
-		$ajax_loggedin_params = array( 'note' => T_('Also use JS forms for logged in users') );
-		if( !$ajax_enabled )
-		{
-			$ajax_loggedin_params[ 'disabled' ] = 'disabled';
-		}
-		$Form->checkbox_input( 'ajax_form_enabled', $ajax_enabled, T_('Enable AJAX forms'), array( 'note'=>T_('Comment, Contact & Quick registration forms will be fetched by javascript') ) );
-		$Form->checkbox_input( 'ajax_form_loggedin_enabled', $edited_Blog->get_setting('ajax_form_loggedin_enabled'), '', $ajax_loggedin_params );
+		$Form->checklist( array(
+				array( 'ajax_form_enabled', 1, T_('Comment, Contact & Quick registration forms will be fetched by javascript'), $edited_Blog->get_setting( 'ajax_form_enabled' ) ),
+				array( 'ajax_form_loggedin_enabled', 1, T_('Also use JS forms for logged in users'), $edited_Blog->get_setting( 'ajax_form_loggedin_enabled' ), ! $edited_Blog->get_setting( 'ajax_form_enabled' ) ),
+			), 'ajax_form', T_('Enable AJAX forms') );
+
 		$Form->checkbox_input( 'cache_enabled', $edited_Blog->get_setting('cache_enabled'), get_icon( 'page_cache_on' ).' '.T_('Enable page cache'), array( 'note'=>T_('Cache rendered blog pages') ) );
 		$Form->checkbox_input( 'cache_enabled_widgets', $edited_Blog->get_setting('cache_enabled_widgets'), get_icon( 'block_cache_on' ).' '.T_('Enable widget/block cache'), array( 'note'=>T_('Cache rendered widgets') ) );
 	$Form->end_fieldset();
@@ -167,12 +164,21 @@ if( $current_User->check_perm( 'blog_admin', 'edit', false, $edited_Blog->ID ) )
 
 $Form->begin_fieldset( T_('Software credits').get_manual_link('software-credits') );
 	$max_credits = $edited_Blog->get_setting( 'max_footer_credits' );
-	$note = T_('You get the b2evolution software for <strong>free</strong>. We do appreciate you giving us credit. <strong>Thank you for your support!</strong>');
-	if( $max_credits < 1 )
-	{
-		$note = '<img src="'.$rsc_url.'smilies/icon_sad.gif" alt="" class="bottom"> '.$note;
+	if( is_pro() )
+	{	// Allow to remove "Powered by b2evolution" logos only for PRO version:
+		$Form->checkbox( 'powered_by_logos', $edited_Blog->get_setting( 'powered_by_logos' ), T_('Powered by logos'), T_('Check this to remove "Powered by b2evolution" logos.') );
+		// Don't inform about free version for PRO version:
+		$max_credits_note = '';
 	}
-	$Form->text( 'max_footer_credits', $max_credits, 1, T_('Max footer credits'), $note, 1 );
+	else
+	{	// Inform about free version:
+		$max_credits_note = T_('You get the b2evolution software for <strong>free</strong>. We do appreciate you giving us credit. <strong>Thank you for your support!</strong>');
+		if( $max_credits < 1 )
+		{
+			$max_credits_note = '<img src="'.$rsc_url.'smilies/icon_sad.gif" /> '.$max_credits_note;
+		}
+	}
+	$Form->text( 'max_footer_credits', $max_credits, 1, T_('Max footer credits'), $max_credits_note, 1 );
 $Form->end_fieldset();
 
 
@@ -193,29 +199,26 @@ if( $current_User->check_perm( 'blog_admin', 'edit', false, $edited_Blog->ID ) )
 }
 
 
-$Form->end_form( array( array( 'submit', 'submit', T_('Save Changes!'), 'SaveButton' ) ) );
+$Form->end_form( array( array( 'submit', 'submit', T_('Save Changes!'), 'SaveButton', 'data-shortcut' => 'ctrl+s,command+s,ctrl+enter,command+enter' ) ) );
 
 ?>
 
 <script>
-	jQuery( '#ajax_form_enabled' ).click( function()
+	jQuery( 'input[name=ajax_form_enabled]' ).click( function()
 	{
-		if( jQuery( '#ajax_form_enabled' ).attr( "checked" ) )
+		var checked = jQuery( this ).prop( 'checked' );
+		jQuery( 'input[name=ajax_form_loggedin_enabled]' ).prop( 'disabled', ! checked );
+		if( ! checked )
 		{
-			jQuery( '#ajax_form_loggedin_enabled' ).attr( "disabled", false );
-		}
-		else
-		{
-			jQuery( '#cache_enabled' ).attr( "checked", false );
-			jQuery( '#ajax_form_loggedin_enabled' ).attr( "disabled", true );
+			jQuery( 'input[name=cache_enabled]' ).prop( 'checked', false );
 		}
 	} );
 	jQuery( '#cache_enabled' ).click( function()
 	{
-		if( jQuery( '#cache_enabled' ).attr( "checked" ) )
+		if( jQuery( this ).prop( 'checked' ) )
 		{
-			jQuery( '#ajax_form_enabled' ).attr( "checked", true );
-			jQuery( '#ajax_form_loggedin_enabled' ).attr( "disabled", false );
+			jQuery( 'input[name=ajax_form_enabled]' ).prop( 'checked', true );
+			jQuery( 'input[name=ajax_form_loggedin_enabled]' ).prop( 'disabled', false );
 		}
 	} );
 	jQuery( '#advanced_perms' ).click( function()

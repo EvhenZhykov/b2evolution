@@ -10,7 +10,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}.
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}.
  *
  * @package evoskins
  */
@@ -338,7 +338,7 @@ echo '<div class="profile_column_right">';
 					'after_image_legend'  => NULL,
 					'image_size'          => 'crop-top-80x80',
 					'image_link_to'       => 'original',
-					'image_link_title'    => $User->login,
+					'image_link_title'    => $User->get_username(),
 					'image_link_rel'      => 'lightbox[user]'
 				) );
 			}

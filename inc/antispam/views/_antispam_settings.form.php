@@ -7,7 +7,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}
  * Parts of this file are copyright (c)2004-2006 by Daniel HAHLER - {@link http://thequod.de/contact}.
  *
  * @package admin
@@ -86,7 +86,7 @@ $Form->end_fieldset();
 if( $current_User->check_perm( 'options', 'edit' ) )
 {
 	$Form->end_form( array(
-		array( 'submit', 'submit', T_('Save Changes!'), 'SaveButton' ),
+		array( 'submit', 'submit', T_('Save Changes!'), 'SaveButton', 'data-shortcut' => 'ctrl+s,command+s,ctrl+enter,command+enter' ),
 		array( 'submit', 'submit[restore_defaults]', T_('Restore defaults'), 'ResetButton' ),
 		) );
 }

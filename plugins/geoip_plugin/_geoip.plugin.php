@@ -14,7 +14,7 @@ use GeoIp2\Database\Reader;
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}
  * Parts of this file are copyright (c)2004-2006 by Daniel HAHLER - {@link http://thequod.de/contact}.
  *
  * @package plugins
@@ -38,7 +38,7 @@ class geoip_plugin extends Plugin
 	var $name = 'GeoIP';
 	var $code = 'evo_GeoIP';
 	var $priority = 45;
-	var $version = '6.11.4';
+	var $version = '7.1.2';
 	var $author = 'The b2evo Group';
 	var $group = 'antispam';
 	var $plugin_actions = array( 'geoip_download', 'geoip_find_country', 'geoip_fix_country' );
@@ -457,7 +457,7 @@ jQuery( document ).ready( function()
 		}
 		else
 		{	// Get a setting for normal registration form:
-			$registration_require_country = (bool)$Settings->get('registration_require_country');
+			$registration_require_country = in_array( 'country', get_registration_template_required_fields() );
 		}
 		if( !$registration_require_country )
 		{	// Country is not required on registration form. Exit here.
@@ -499,9 +499,6 @@ jQuery( document ).ready( function()
 				{
 					$Form = & $params['Form'];
 				}
-
-				// Disable this setting temporary to hide a select list with countries
-				$Settings->set( 'registration_require_country', 0 );
 
 				if( isset( $params['Widget'] ) )
 				{	// Hide country selector on widget:

@@ -15,7 +15,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}
  * Parts of this file are copyright (c)2004-2006 by Daniel HAHLER - {@link http://thequod.de/contact}.
  * Parts of this file are copyright (c)2005-2006 by PROGIDISTRI - {@link http://progidistri.com/}.
  *
@@ -140,7 +140,7 @@ function param_format( $value, $type = 'raw' )
  * - htmlspecialchars (convert all html to special characters)
  * Value type will be forced only if resulting value (probably from default then) is !== NULL
  * @param mixed Default value or TRUE if user input required
- * @param boolean Do we need to memorize this to regenerate the URL for this page?
+ * @param boolean|string TRUE to memorize this to regenerate the URL for this page, FALSE - don't memorize, 'auto' - to memorize only if param is coming from $_GET, $_POST or $_COOKIE
  * @param boolean Override if variable already set
  * @param boolean Force setting of variable to default if no param is sent and var wasn't set before
  * @param mixed true will refuse illegal values,
@@ -519,8 +519,9 @@ function param( $var, $type = 'raw', $default = '', $memorize = false,
 	/*
 	 * STEP 3: memorize the value for later url regeneration
 	 */
-	if( $memorize )
-	{ // Memorize this parameter
+	if( $memorize === true ||
+	    ( $memorize === 'auto' && ( isset( $_POST[$var] ) || isset( $_GET[$var] ) || isset( $_COOKIE[$var] ) ) ) )
+	{	// Memorize this parameter:
 		memorize_param( $var, $type, $default );
 	}
 
@@ -874,11 +875,12 @@ function param_check_new_user_email( $var, $value = NULL, $link_Blog = NULL )
 	}
 
 	$SQL = new SQL( 'Check if already registered user has the same email address on new user registration' );
-	$SQL->SELECT( 'user_ID' );
+	$SQL->SELECT( 'user_ID, user_email, user_pass, user_pass_driver' );
 	$SQL->FROM( 'T_users' );
 	$SQL->WHERE( 'user_email = '.$DB->quote( utf8_strtolower( $value ) ) );
 	$SQL->LIMIT( 1 );
-	if( $DB->get_var( $SQL ) )
+	$result = $DB->get_row( $SQL );
+	if( $result )
 	{	// Don't allow the duplicate emails:
 		if( $link_Blog === NULL )
 		{
@@ -888,9 +890,72 @@ function param_check_new_user_email( $var, $value = NULL, $link_Blog = NULL )
 		global $dummy_fields;
 		$lostpassword_url = ( $link_Blog === NULL ? get_lostpassword_url() : $link_Blog->get( 'lostpasswordurl' ) );
 		$lostpassword_url = url_add_param( $lostpassword_url, $dummy_fields['login'].'='.urlencode( $value ) );
-		param_error( $var, sprintf( T_('You already registered on this site. You can <a %s>log in here</a>. If you don\'t know it or have forgotten it, you can <a %s>reset your password here</a>.'),
-			'href="'.( $link_Blog === NULL ? get_login_url( '' ) : $link_Blog->get( 'loginurl' ) ).'"',
-			'href="'.$lostpassword_url.'"' ) );
+
+		$error_message = sprintf( T_('You already have an account with email address "%s" on this site.'), $value );
+
+		if( ! empty( $result->user_pass ) )
+		{
+			$error_message .= ' '.sprintf( T_('You can <a %s>log in with your password here</a>.'), 'href="'.( $link_Blog === NULL ? get_login_url( '' ) : $link_Blog->get( 'loginurl' ) ).'"' );
+		}
+
+		// Check for linked social networks:
+		$UserCache = & get_UserCache();
+		if( $User = & $UserCache->get_by_ID( $result->user_ID, false, false ) )
+		{
+			global $Plugins;
+			$SQL = new SQL( 'Check if some social networks are linked to the account' );
+			$SQL->SELECT( 'usn_user_ID, usn_sn_ID, sn_name' );
+			$SQL->FROM( 'T_users__social_network' );
+			$SQL->FROM_add( 'LEFT JOIN T_social__network ON sn_id = usn_sn_ID' );
+			$SQL->WHERE( 'usn_user_ID = '.$DB->quote( $result->user_ID ) );
+			$SQL->ORDER_BY( 'sn_name ASC' );
+			$results = $DB->get_results( $SQL );
+
+			$links = array();
+			$providers = array();
+			foreach( $results as $row )
+			{
+				$providers[] = $row->sn_name;
+			}
+
+			$params = array(
+					'providers'   => $providers,
+					'links'       => & $links,
+					'link_params' => array(
+							'redirect_to' => param( 'redirect_to', 'url', get_current_url() ),
+							'return_to'   => param( 'return_to', 'url', get_current_url() ),
+							'show_icon'   => false,
+							'link_class'  => '',
+							'link_text_login'    => '$provider$',
+							'link_text_register' => '$provider$',
+						),
+				);
+
+			$temp_params = $params;
+			foreach( $params as $param_key => $param_value )
+			{ // Pass all params by reference, in order to give possibility to modify them by plugin
+				// So plugins can add some data before/after processing
+				$params[ $param_key ] = & $params[ $param_key ];
+			}
+
+			if( ! empty( $providers ) )
+			{
+				$Plugins->trigger_event_first_true_with_params( 'GetAuthLinksForSocialNetworks', $params );
+				if( ! empty( $params['links'] ) )
+				{
+					$error_message .= ' '.sprintf( T_('You can log in with %s.'), implode( ' / ', $params['links'] ) );
+				}
+			}
+			$params = $temp_params;
+		}
+
+		$error_message .= ' '.sprintf( T_('If you don’t know it or have forgotten your password, you can <a %s>reset it here</a>.'), 'href="'.$lostpassword_url.'"' );
+
+		param_error( $var, $error_message );
+
+		// param_error( $var, sprintf( T_('You already registered on this site. You can <a %s>log in here</a>. If you don\'t know it or have forgotten it, you can <a %s>reset your password here</a>.'),
+		// 	'href="'.( $link_Blog === NULL ? get_login_url( '' ) : $link_Blog->get( 'loginurl' ) ).'"',
+		// 	'href="'.$lostpassword_url.'"' ) );
 		return false;
 	}
 
@@ -2024,7 +2089,7 @@ function regenerate_url( $ignore = '', $set = '', $pagefileurl = '', $glue = '&a
 		$skip = false;
 		foreach( $ignore as $ignore_pattern )
 		{
-			if( $ignore_pattern[0] == '/' )
+			if( substr( $ignore_pattern, 0, 1 ) == '/' )
 			{ // regexp:
 				if( preg_match( $ignore_pattern, $var ) )
 				{	// Skip this param!
@@ -2535,6 +2600,16 @@ function check_html_sanity( $content, $context = 'posting', $User = NULL, $encod
 			$verbose = false;
 			break;
 
+		case 'quick_template':
+			$Group = ( $User ? $User->get_Group() : false );
+			$xhtmlvalidation  = false;
+			$allow_css_tweaks = $Group && $Group->perm_xhtml_css_tweaks;
+			$allow_javascript = $Group && $Group->perm_xhtml_javascript;
+			$allow_iframes    = $Group && $Group->perm_xhtml_iframes;
+			$allow_objects    = $Group && $Group->perm_xhtml_objects;
+			$bypass_antispam  = $Group && $Group->perm_bypass_antispam;
+			break;
+
 		default:
 			debug_die( 'unknown context: '.$context );
 	}
@@ -2980,7 +3055,7 @@ function param_format_condition( $condition, $action, $rules = NULL )
 		{	// This is a group of conditions, Run this function recursively:
 			$condition_rules[] = param_format_condition( $rule, $action, $rules );
 		}
-		elseif( $rules === NULL || 
+		elseif( $rules === NULL ||
 		        ( $rules !== NULL && in_array( $rule->id, $allowed_rules ) && ! in_array( $rule->id, $denied_rules ) ) )
 		{	// This is a single allowed field, Format condition only for this field:
 			if( ! isset( $rule->type ) )

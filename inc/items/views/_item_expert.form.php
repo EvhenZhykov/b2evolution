@@ -7,7 +7,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}.
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}.
  *
  * @package admin
  */
@@ -88,12 +88,17 @@ $Form->begin_form( '', '', $params );
 	if( ! empty( $original_item_ID ) )
 	{
 		$Form->hidden( 'p', $original_item_ID );
+		if( $action == 'new_version' )
+		{	// Set a flag to know this is a new version of this Item:
+			$Form->hidden( 'source_version_item_ID', $original_item_ID );
+		}
 	}
 
 	$Form->hidden( 'redirect_to', $redirect_to );
 
 	// In case we send this to the blog for a preview :
 	$Form->hidden( 'preview', 1 );
+	$Form->hidden( 'preview_block', 0 );
 	$Form->hidden( 'more', 1 );
 
 	// Post type
@@ -132,7 +137,8 @@ $Form->begin_form( '', '', $params );
 	{
 		if( ! empty( $original_item_ID ) )
 		{	// Set form title for duplicating the item:
-			$form_title_item_ID = sprintf( T_('Duplicating Item %s'), '<a href="'.$admin_url.'?ctrl=items&amp;blog='.$Blog->ID.'&amp;p='.$original_item_ID.'" class="post_type_link">#'.$original_item_ID.'</a>' );
+			$form_title_item_ID = sprintf( ( $action == 'new_version' ? T_('Add version for Item %s') : T_('Duplicating Item %s') ),
+				'<a href="'.$admin_url.'?ctrl=items&amp;blog='.$Blog->ID.'&amp;p='.$original_item_ID.'" class="post_type_link">#'.$original_item_ID.'</a>' );
 		}
 		else
 		{	// Set form title for creating new item:
@@ -158,7 +164,10 @@ $Form->begin_form( '', '', $params );
 		$Form->begin_fieldset( '', array( 'class' => 'evo_fields_table__single_row' ) );
 		if( $edited_Item->get_type_setting( 'use_short_title' ) == 'optional' )
 		{	// Display a post short title field:
-			$Form->text_input( 'post_short_title', htmlspecialchars_decode( $edited_Item->get( 'short_title' ) ), 50, T_('Short title'), '', array( 'maxlength' => 50 ) );
+			$short_title_maxlen = intval( $edited_Item->get_type_setting( 'short_title_maxlen' ) );
+			$Form->text_input( 'post_short_title', htmlspecialchars_decode( $edited_Item->get( 'short_title' ) ), 50, T_('Short title'), '', array(
+					'maxlength' => $short_title_maxlen,
+					'data-recommended-length' => '20;30' ) );
 		}
 		else
 		{	// Hide a post short title field:
@@ -170,25 +179,15 @@ $Form->begin_form( '', '', $params );
 	$Form->begin_fieldset( '', array( 'class' => 'evo_fields_table__single_row' ) );
 	if( $edited_Item->get_type_setting( 'use_title' ) != 'never' )
 	{	// Display a post title field:
-		$Form->text_input( 'post_title', $item_title, 20, T_('Title'), '', array( 'maxlength' => 255, 'required' => ( $edited_Item->get_type_setting( 'use_title' ) == 'required' ) ) );
+		$title_maxlen = intval( $edited_Item->get_type_setting( 'title_maxlen' ) );
+		$Form->text_input( 'post_title', $item_title, 20, T_('Title'), '', array(
+				'maxlength' => $title_maxlen,
+				'data-recommended-length' => '60;65',
+				'required' => ( $edited_Item->get_type_setting( 'use_title' ) == 'required' ) ) );
 	}
 	else
 	{	// Hide a post title field:
 		$Form->hidden( 'post_title', $item_title );
-	}
-
-	$locale_options = locale_options( $edited_Item->get( 'locale' ), false, true );
-	if( ( $Blog->get_setting( 'new_item_locale_source' ) == 'use_coll' &&
-	      $edited_Item->get( 'locale' ) == $Blog->get( 'locale' ) &&
-	      isset( $locales[ $edited_Item->get( 'locale' ) ] )
-	    ) || is_array( $locale_options ) )
-	{	// Force to use collection locale because it is restricted by collection setting and the edited item has the same locale as collection
-		// OR only single locale is allowed to select:
-		$Form->hidden( 'post_locale', $edited_Item->get( 'locale' ) );
-	}
-	else
-	{	// Allow to select a locale:
-		$Form->select_input_options( 'post_locale', $locale_options, T_('Language'), '', array( 'style' => 'width:180px' ) );
 	}
 	$Form->end_fieldset();
 	$Form->switch_layout( NULL );
@@ -221,7 +220,7 @@ $Form->begin_form( '', '', $params );
 		// ---------------------------- TEXTAREA -------------------------------------
 		$Form->fieldstart = '<div class="edit_area">';
 		$Form->fieldend = "</div>\n";
-		$Form->textarea_input( 'content', $item_content, 16, '', array( 'cols' => 40 , 'id' => 'itemform_post_content', 'class' => 'autocomplete_usernames' ) );
+		$Form->textarea_input( 'content', $item_content, 16, '', array( 'cols' => 40 , 'id' => 'itemform_post_content', 'class' => 'autocomplete_usernames link_attachment_dropzone' ) );
 		?>
 		<script>
 			<!--
@@ -257,8 +256,8 @@ $Form->begin_form( '', '', $params );
 	}
 	$Plugins->trigger_event( 'AdminDisplayEditorButton', $admin_editor_params );
 	$plugin_button = ob_get_flush();
-	if( empty( $plugin_button ) )
-	{	// If button is not displayed by any plugin
+	if( empty( $plugin_button ) && $edited_Item->get_type_setting( 'use_text' ) != 'never')
+	{	// If button is not displayed by any plugin and text is allowed for current item type:
 		// Display a current status of HTML allowing for the edited item:
 		echo '<span class="html_status">';
 		if( $edited_Item->get_type_setting( 'allow_html' ) )
@@ -272,6 +271,11 @@ $Form->begin_form( '', '', $params );
 		// Display manual link for more info:
 		echo get_manual_link( 'post-allow-html' );
 		echo '</span>';
+	}
+	if( $edited_Item->get_type_setting( 'usage' ) == 'widget-page' &&
+	    $current_User->check_perm( 'blog_properties', 'edit', false, $Blog->ID ) )
+	{	// Display a button to edit widgets only if item type is used for page containers and current user has permission to edit widgets:
+		echo '<a href="'.$admin_url.'?ctrl=widgets&amp;blog='.$Blog->ID.'" class="btn btn-primary">'.T_('Edit widgets now').'</a>';
 	}
 	echo '</div>';
 
@@ -394,6 +398,7 @@ $Form->begin_form( '', '', $params );
 					'required' => ( $edited_Item->get_type_setting( 'use_excerpt' ) == 'required' ),
 					'style'    => 'width:100%',
 					'note'     => $excerpt_checkbox,
+					'data-recommended-length' => '80;120',
 				) );
 		}
 		else
@@ -404,14 +409,30 @@ $Form->begin_form( '', '', $params );
 
 	if( $edited_Item->get_type_setting( 'use_url' ) != 'never' )
 	{	// Display url:
-		$Form->text_input( 'post_url', $edited_Item->get( 'url' ), 20, T_('Link to url'), '', array(
+		if( is_pro() )
+		{	// Only PRO feature for using of post link URL as an External Canonical URL:
+			$external_canonical_url_checkbox = '<label>'
+					.'<input name="post_external_canonical_url" value="1" type="checkbox"'.( $edited_Item->get_setting( 'external_canonical_url' ) ? ' checked="checked"' : '' ).' /> '
+					.sprintf( T_('Use as <a %s>External canonical URL</a>'), 'href="'.get_manual_url( 'external-canonical-url' ).'"' ).' '.get_pro_label()
+				.'</label>';
+		}
+		else
+		{
+			$external_canonical_url_checkbox = '';
+		}
+		$Form->text_input( 'post_url', $edited_Item->get( 'url' ), 20, T_('Link to url'), $external_canonical_url_checkbox, array(
 				'maxlength' => 255,
+				'data-maxlength' => 255,
 				'required'  => ( $edited_Item->get_type_setting( 'use_url' ) == 'required' )
 			) );
 	}
 	else
 	{	// Hide url:
 		$Form->hidden( 'post_url', $edited_Item->get( 'url' ) );
+		if( is_pro() )
+		{	// Only PRO feature for using of post link URL as an External Canonical URL:
+			$Form->hidden( 'post_external_canonical_url', $edited_Item->get_setting( 'external_canonical_url' ) );
+		}
 	}
 
 	if( $is_not_content_block )
@@ -419,7 +440,8 @@ $Form->begin_form( '', '', $params );
 		if( $edited_Item->get_type_setting( 'use_title_tag' ) != 'never' )
 		{	// Display <title> tag:
 			$Form->text_input( 'titletag', $edited_Item->get( 'titletag' ), 40, T_('&lt;title&gt; tag'), '', array(
-					'maxlength' => 255,
+					'maxlength' => 500,
+					'data-recommended-length' => '60;65',
 					'required'  => ( $edited_Item->get_type_setting( 'use_title_tag' ) == 'required' )
 				) );
 		}
@@ -431,7 +453,8 @@ $Form->begin_form( '', '', $params );
 		if( $edited_Item->get_type_setting( 'use_meta_desc' ) != 'never' )
 		{	// Display <meta> description:
 			$Form->text_input( 'metadesc', $edited_Item->get_setting( 'metadesc' ), 40, T_('&lt;meta&gt; desc'), '', array(
-					'maxlength' => 255,
+					'maxlength' => 500,
+					'data-recommended-length' => '80;120',
 					'required'  => ( $edited_Item->get_type_setting( 'use_meta_desc' ) == 'required' )
 				) );
 		}
@@ -443,13 +466,22 @@ $Form->begin_form( '', '', $params );
 		if( $edited_Item->get_type_setting( 'use_meta_keywds' ) != 'never' )
 		{	// Display <meta> keywords:
 			$Form->text_input( 'metakeywords', $edited_Item->get_setting( 'metakeywords' ), 40, T_('&lt;meta&gt; keywds'), '', array(
-					'maxlength' => 255,
+					'maxlength' => 500,
+					'data-recommended-length' => '200;250',
 					'required'  => ( $edited_Item->get_type_setting( 'use_meta_keywds' ) == 'required' )
 				) );
 		}
 		else
 		{	// Hide <meta> keywords:
 			$Form->hidden( 'metakeywords', $edited_Item->get_setting( 'metakeywords' ) );
+		}
+
+		if( $edited_Item->get_type_setting( 'allow_switchable' ) )
+		{	// Display "Switchable content" options:
+			$Form->text_input( 'item_switchable_params', $edited_Item->get_setting( 'switchable_params' ), 40, T_('Switchable content'), '', array(
+					'maxlength' => 500,
+					'input_prefix' => '<div><input type="checkbox" id="item_switchable_params" name="item_switchable" value="1"'.( $edited_Item->get_setting( 'switchable' ) ? ' checked="checked"' : '' ).' /> '.TB_('Enabled with params').':</div>',
+				) );
 		}
 	}
 
@@ -484,22 +516,22 @@ $Form->begin_form( '', '', $params );
 
 	if( $current_User->check_perm( 'meta_comment', 'view', false, $Blog->ID ) )
 	{
-		// ####################### META COMMENTS #########################
+		// ####################### INTERNAL COMMENTS #########################
 		$currentpage = param( 'currentpage', 'integer', 1 );
 		$total_comments_number = generic_ctp_number( $edited_Item->ID, 'metas', 'total' );
 		param( 'comments_number', 'integer', $total_comments_number );
 		param( 'comment_type', 'string', 'meta' );
 
-		$Form->begin_fieldset( T_('Meta comments').get_manual_link( 'meta-comments-panel' )
+		$Form->begin_fieldset( T_('Internal comments').get_manual_link( 'meta-comments-panel' )
 						.( $total_comments_number > 0 ? ' <span class="badge badge-important">'.$total_comments_number.'</span>' : '' ),
 					array( 'id' => 'itemform_meta_cmnt', 'fold' => true, 'deny_fold' => ( $total_comments_number > 0 ) ) );
 
 		if( $creating )
 		{	// Display button to save new creating item:
-			$Form->submit( array( 'actionArray[create_edit]', /* TRANS: This is the value of an input submit button */ T_('Save post to start adding Meta comments'), 'btn-primary' ) );
+			$Form->submit( array( 'actionArray[create_edit]', /* TRANS: This is the value of an input submit button */ T_('Save post to start adding Internal comments'), 'btn-primary' ) );
 		}
 		else
-		{	// Display meta comments of the edited item:
+		{	// Display internal comments of the edited item:
 			global $CommentList, $UserSettings;
 			$CommentList = new CommentList2( $Blog );
 
@@ -522,18 +554,18 @@ $Form->begin_form( '', '', $params );
 			$CommentList->display_if_empty( array(
 					'before'    => '<div class="evo_comment"><p>',
 					'after'     => '</p></div>',
-					'msg_empty' => T_('No meta comment for this post yet...'),
+					'msg_empty' => T_('No internal comment for this post yet...'),
 				) );
 			require $inc_path.'comments/views/_comment_list.inc.php';
 			echo '</div>'; // comments_container div
 			echo '</div>';
 
 			if( $edited_Item->can_meta_comment() )
-			{ // Display a link to add new meta comment if current user has a permission
-				echo action_icon( T_('Add meta comment').'...', 'new', $admin_url.'?ctrl=items&amp;p='.$edited_Item->ID.'&amp;comment_type=meta&amp;blog='.$Blog->ID.'#comments', T_('Add meta comment').' &raquo;', 3, 4 );
+			{ // Display a link to add new internal comment if current user has a permission
+				echo action_icon( T_('Add internal comment').'...', 'new', $admin_url.'?ctrl=items&amp;p='.$edited_Item->ID.'&amp;comment_type=meta&amp;blog='.$Blog->ID.'#comments', T_('Add internal comment').' &raquo;', 3, 4 );
 			}
 
-			// Load JS functions to work with meta comments:
+			// Load JS functions to work with internal comments:
 			load_funcs( 'comments/model/_comment_js.funcs.php' );
 		}
 
@@ -552,55 +584,26 @@ $Form->begin_form( '', '', $params );
 
 	// ############################ WORKFLOW #############################
 
-	if( $is_not_content_block && $Blog->get_setting( 'use_workflow' ) && $current_User->check_perm( 'blog_can_be_assignee', 'edit', false, $Blog->ID ) )
-	{	// We want to use workflow properties for this blog:
+	if( $is_not_content_block && $edited_Item->can_edit_workflow() )
+	{	// Display workflow properties if current user can edit at least one workflow property:
 		$Form->begin_fieldset( T_('Workflow properties').get_manual_link( 'post-edit-workflow-panel' ), array( 'id' => 'itemform_workflow_props', 'fold' => true ) );
 
 			echo '<div id="itemform_edit_workflow" class="edit_fieldgroup">';
 			$Form->switch_layout( 'linespan' );
 
-			$Form->select_input_array( 'item_priority', $edited_Item->priority, item_priority_titles(), T_('Priority'), '', array( 'force_keys_as_values' => true ) );
+			$edited_Item->display_workflow_field( 'status', $Form );
 
 			echo ' '; // allow wrapping!
 
-			// Load current blog members into cache:
-			$UserCache = & get_UserCache();
-			// Load only first 21 users to know when we should display an input box instead of full users list
-			$UserCache->load_blogmembers( $Blog->ID, 21, false );
-
-			if( count( $UserCache->cache ) > 20 )
-			{
-				$assigned_User = & $UserCache->get_by_ID( $edited_Item->get( 'assigned_user_ID' ), false, false );
-				$Form->username( 'item_assigned_user_login', $assigned_User, T_('Assigned to'), '', 'only_assignees', array( 'size' => 10 ) );
-			}
-			else
-			{
-				$Form->select_object( 'item_assigned_user_ID', NULL, $edited_Item, T_('Assigned to'),
-														'', true, '', 'get_assigned_user_options' );
-			}
+			$edited_Item->display_workflow_field( 'user', $Form );
 
 			echo ' '; // allow wrapping!
 
-			$ItemStatusCache = & get_ItemStatusCache();
-			$ItemStatusCache->load_all();
-			$ItemTypeCache = & get_ItemTypeCache();
-			$current_ItemType = & $edited_Item->get_ItemType();
-			$Form->select_options( 'item_st_ID', $ItemStatusCache->get_option_list( $edited_Item->pst_ID, true, 'get_name', $current_ItemType->get_ignored_post_status() ), T_('Task status') );
+			$edited_Item->display_workflow_field( 'priority', $Form );
 
 			echo ' '; // allow wrapping!
 
-			if( $Blog->get_setting( 'use_deadline' ) )
-			{	// Display deadline fields only if it is enabled for collection:
-				$Form->begin_line( T_('Deadline'), 'item_deadline' );
-
-					$datedeadline = $edited_Item->get( 'datedeadline' );
-					$Form->date( 'item_deadline', $datedeadline, '' );
-
-					$datedeadline_time = empty( $datedeadline ) ? '' : date( 'Y-m-d H:i', strtotime( $datedeadline ) );
-					$Form->time( 'item_deadline_time', $datedeadline_time, T_('at'), 'hh:mm' );
-
-				$Form->end_line();
-			}
+			$edited_Item->display_workflow_field( 'deadline', $Form );
 
 			$Form->switch_layout( NULL );
 			echo '</div>';
@@ -631,9 +634,9 @@ $Form->begin_form( '', '', $params );
 
 	if( $edited_Item->get_type_setting( 'use_parent' ) != 'never' )
 	{	// Display parent ID:
+		$parent_info = '<span id="parent_item_info">';
 		if( $parent_Item = & $edited_Item->get_parent_Item() )
 		{	// Get parent item info if it is defined:
-			$parent_info = '';
 			$status_icons = get_visibility_statuses( 'icons' );
 			if( isset( $status_icons[ $parent_Item->get( 'status' ) ] ) )
 			{	// Status colored icon:
@@ -644,10 +647,12 @@ $Form->begin_form( '', '', $params );
 			// Icon to edit:
 			$parent_info .= ' '.$parent_Item->get_edit_link( array( 'text' => '#icon#' ) );
 		}
-		else
-		{	// No parent item defined
-			$parent_info = '';
-		}
+		$parent_info .= '</span>';
+
+		// Icon to select parent:
+		$parent_info .= action_icon( T_('Select parent'), 'magnifier', '#', NULL, NULL, NULL, array(
+				'onclick' => 'return evo_select_parent_load_window( '.$edited_Item->ID.', \''.$edited_Item->get_blog()->get( 'urlname' ).'\' )' ) );
+
 		echo '<tr><td><strong>'.T_('Parent ID').':</strong></td><td>';
 		$Form->text_input( 'post_parent_ID', $edited_Item->get( 'parent_ID' ), 11, '', $parent_info, array(
 				'required' => ( $edited_Item->get_type_setting( 'use_parent' ) == 'required' ),
@@ -684,35 +689,46 @@ $Form->begin_form( '', '', $params );
 
 	echo '</table>';
 
-	if( $edited_Item->get_type_setting( 'allow_featured' ) )
-	{ // Display featured
-		$Form->checkbox_basic_input( 'item_featured', $edited_Item->featured, '<strong>'.T_('Featured post').'</strong>' );
-	}
-	else
-	{ // Hide featured
-		$Form->hidden( 'item_featured', $edited_Item->featured );
+	if( $current_User->check_perm( 'blog_edit_ts', 'edit', false, $Blog->ID ) )
+	{	// If user has a permission to edit advanced properties of items:
+		if( $edited_Item->get_type_setting( 'allow_featured' ) )
+		{ // Display featured
+			$Form->checkbox_basic_input( 'item_featured', $edited_Item->featured, '<strong>'.T_('Featured post').'</strong>' );
+		}
+		else
+		{ // Hide featured
+			$Form->hidden( 'item_featured', $edited_Item->featured );
+		}
 	}
 
-	if( $is_not_content_block )
+	if( $Blog->get_setting( 'track_unread_content' ) )
+	{	// Display setting to mark Item as "must read" when tracking of unread content is enabled for collection:
+		$Form->checkbox_basic_input( 'item_mustread', $edited_Item->get_setting( 'mustread' ), '<strong>'.T_('Must read').'</strong> '.get_pro_label(), array( 'disabled' => ! is_pro() ) );
+	}
+
+	if( $is_not_content_block && $edited_Item->get_type_setting( 'allow_breaks' ) )
 	{	// Display "hide teaser" checkbox for item with type usage except of content block:
 		$Form->checkbox_basic_input( 'item_hideteaser', $edited_Item->get_setting( 'hide_teaser' ), '<strong>'.sprintf( T_('Hide teaser when displaying part after %s'), '<code>[teaserbreak]</code>' ).'</strong>' );
 	}
 
 	// Single/page view:
-	if( ! in_array( $edited_Item->get_type_setting( 'usage' ), array( 'intro-front', 'intro-main', 'intro-cat', 'intro-tag', 'intro-sub', 'intro-all', 'content-block', 'special' ) ) )
-	{	// We don't need this setting for intro, content block and special items:
-		echo '<div class="itemform_extra_radio">';
-		$Form->radio( 'post_single_view', $edited_Item->get( 'single_view' ), array(
-				array( 'normal', T_('Normal') ),
-				array( '404', '404' ),
-				array( 'redirected', T_('Redirected') ),
-			), T_('Single/page view'), true );
-		echo '</div>';
+	if( $current_User->check_perm( 'blog_edit_ts', 'edit', false, $Blog->ID ) )
+	{	// If user has a permission to edit advanced properties of items:
+		if( ! in_array( $edited_Item->get_type_setting( 'usage' ), array( 'intro-front', 'intro-main', 'intro-cat', 'intro-tag', 'intro-sub', 'intro-all', 'content-block', 'special' ) ) )
+		{	// We don't need this setting for intro, content block and special items:
+			echo '<div class="itemform_extra_radio">';
+			$Form->radio( 'post_single_view', $edited_Item->get( 'single_view' ), array(
+					array( 'normal', T_('Normal') ),
+					array( '404', '404' ),
+					array( 'redirected', T_('Redirected') ),
+				), T_('Single/page view'), true );
+			echo '</div>';
+		}
 	}
 
 	// Issue date:
 	if( $current_User->check_perm( 'blog_edit_ts', 'edit', false, $Blog->ID ) )
-	{	// If user has a permission to edit time of items:
+	{	// If user has a permission to edit advanced properties of items:
 		echo '<div class="itemform_extra_radio">';
 		$Form->output = false;
 		$item_issue_date_time = $Form->date( 'item_issue_date', $edited_Item->get( 'issue_date' ), '' );
@@ -731,14 +747,71 @@ $Form->begin_form( '', '', $params );
 
 
 	// ################### TEXT RENDERERS ###################
+	if( $edited_Item->get_type_setting( 'use_text' ) != 'never' )
+	{	// Display text renderers only when text content is allowed for the item type:
 
-	$Form->begin_fieldset( T_('Text Renderers').get_manual_link( 'post-renderers-panel' )
+		$Form->begin_fieldset( T_('Text Renderers').get_manual_link( 'post-renderers-panel' )
 					.action_icon( T_('Plugins'), 'edit', $admin_url.'?ctrl=coll_settings&amp;tab=plugins&plugin_group=rendering&amp;blog='.$Blog->ID, T_('Plugins'), 3, 4, array( 'class' => 'action_icon pull-right' ) ),
 				array( 'id' => 'itemform_renderers', 'fold' => true ) );
 
-	// fp> TODO: there should be no param call here (shld be in controller)
-	$edited_Item->renderer_checkboxes( param('renderers', 'array:string', NULL) );
+		// fp> TODO: there should be no param call here (shld be in controller)
+		$edited_Item->renderer_checkboxes( param('renderers', 'array:string', NULL) );
 
+		$Form->end_fieldset();
+	}
+
+
+	// ################### LANGUAGE / VERSIONS ###################
+	$multiple_available_locales = count( $edited_Item->get_available_locales() ) > 1;
+	$Form->begin_fieldset( T_('Language / Versions').get_manual_link( 'post-language-versions' ), array(
+			'id'           => 'itemform_language',
+			'fold'         => true,
+			'default_fold' => ! $multiple_available_locales
+		) );
+	$Form->switch_layout( 'fields_table' );
+
+		$Form->select_input_options( 'post_locale', $edited_Item->get_locale_options(), T_('Language'), '', array( 'style' => 'width:auto' ) );
+
+		if( $multiple_available_locales )
+		{	// Display this setting if we have more than 1 enabled locale:
+			$Form->radio( 'post_locale_visibility', $edited_Item->get( 'locale_visibility' ), array(
+					array( 'always', T_('Show for any navigation locale') ),
+					array( 'follow-nav-locale', T_('Show only if matching navigation locale') )
+				), '', true );
+		}
+
+		$other_version_items = $edited_Item->get_other_version_items( $original_item_ID );
+		$item_add_version_link = $edited_Item->get_add_version_link();
+		$item_link_version_link = $edited_Item->get_link_version_link();
+		if( $item_add_version_link || $item_link_version_link || count( $other_version_items ) > 0 )
+		{	// Display other versions and link to add version:
+			echo '<b>'.T_('Other versions').':</b>';
+			echo '<ul style="list-style:disc;margin-left:20px">';
+			$other_version_locales = array( $edited_Item->get( 'locale' ) => 1 );
+			foreach( $other_version_items as $other_version_Item )
+			{	// Find duplicated locales:
+				$other_version_locales[ $other_version_Item->get( 'locale' ) ] = isset( $other_version_locales[ $other_version_Item->get( 'locale' ) ] ) ? 2 : 1;
+			}
+			foreach( $other_version_items as $other_version_Item )
+			{	// Display a link to another version of the Item:
+				echo '<li>'.$other_version_Item->get_title( array( 'link_type' => 'edit_view_url' ) ).' '
+						.locale_flag( $other_version_Item->get( 'locale' ), 'w16px', 'flag', '', false )
+						.'<span class="note'.( $other_version_locales[ $other_version_Item->get( 'locale' ) ] == 2 ? ' red' : '' ).'">('.$other_version_Item->get( 'locale' ).')</span>'
+						.$edited_Item->get_unlink_version_link( array( 'unlink_item_ID' => $other_version_Item->ID ) )
+					.'</li>';
+			}
+			if( $item_add_version_link )
+			{	// Display link to add new version if it is allowed:
+				echo '<li>'.$item_add_version_link.'</li>';
+			}
+			if( $item_link_version_link )
+			{	// Display link to add new version if it is allowed:
+				echo '<li>'.$item_link_version_link.'</li>';
+			}
+			echo '</ul>';
+		}
+
+	$Form->switch_layout( NULL );
 	$Form->end_fieldset();
 
 
@@ -776,26 +849,63 @@ $Form->begin_form( '', '', $params );
 			$Form->switch_layout( NULL );
 		}
 
-		if( $edited_Item->get_type_setting( 'use_comment_expiration' ) != 'never' )
-		{ // Display comment expiration
-			$Form->switch_layout( 'table' );
-			$Form->duration_input( 'expiry_delay',  $edited_Item->get_setting( 'comment_expiry_delay' ), T_('Expiry delay'), 'months', 'hours',
-							array( 'minutes_step' => 1,
-								'required' => $edited_Item->get_type_setting( 'use_comment_expiration' ) == 'required',
-								'note' => T_( 'Older comments and ratings will no longer be displayed.' ) ) );
-			$Form->switch_layout( NULL );
-		}
-		else
-		{ // Hide comment expiration
-			$Form->hidden( 'expiry_delay',  $edited_Item->get_setting( 'comment_expiry_delay' ) );
+		if( $current_User->check_perm( 'blog_edit_ts', 'edit', false, $Blog->ID ) )
+		{	// If user has a permission to edit advanced properties of items:
+			if( $edited_Item->get_type_setting( 'use_comment_expiration' ) != 'never' )
+			{ // Display comment expiration
+				$Form->switch_layout( 'table' );
+				$Form->duration_input( 'expiry_delay',  $edited_Item->get_setting( 'comment_expiry_delay' ), T_('Expiry delay'), 'months', 'hours',
+								array( 'minutes_step' => 1,
+									'required' => $edited_Item->get_type_setting( 'use_comment_expiration' ) == 'required',
+									'note' => T_( 'Older comments and ratings will no longer be displayed.' ) ) );
+				$Form->switch_layout( NULL );
+			}
+			else
+			{ // Hide comment expiration
+				$Form->hidden( 'expiry_delay',  $edited_Item->get_setting( 'comment_expiry_delay' ) );
+			}
 		}
 
 		$Form->end_fieldset();
 	}
 
 
-	if( $is_not_content_block )
-	{	// Display goal tracking and notifications for item with type usage except of content block:
+	if( in_array( $edited_Item->get_type_setting( 'usage' ), array( 'post', 'page', 'widget-page' ) ) )
+	{	// Display user tagging for items which can be displayed only on disp=single, disp=page or disp=widget_page:
+
+		// ################### USER TAGGING ###################
+		$Form->begin_fieldset( T_('User Tagging').get_manual_link( 'post-user-tagging-panel' )
+						.( $current_User->check_perm( 'options', 'view' ) ? action_icon( T_('User Tags'), 'edit', $admin_url.'?ctrl=usertags', T_('User Tags'), 3, 4, array( 'class' => 'action_icon pull-right' ) ) : '' ),
+					array( 'id' => 'itemform_usertags', 'fold' => true ) );
+
+		$Form->switch_layout( 'table' );
+		$Form->formstart = '<table id="item_locations" cellspacing="0" class="fform">'."\n";
+		$Form->labelstart = '<td class="right"><strong>';
+		$Form->labelend = '</strong></td>';
+
+		echo '<p class="note">'.T_('You can tag the (registered) Users who view this page.').'</p>';
+
+		echo $Form->formstart;
+
+		$Form->usertag_input( 'user_tags', $edited_Item->get_setting( 'user_tags' ), 40, T_('Tags'), '', array(
+				'maxlength'    => 255,
+				'style'        => 'width:100%',
+				'input_prefix' => '<span class="evo_input__tags">',
+				'input_suffix' => '</span>',
+			) );
+
+		echo $Form->formend;
+
+		$Form->switch_layout( NULL );
+
+		$Form->end_fieldset();
+	}
+
+	if( $is_not_content_block &&
+	    $current_User->check_perm( 'blog_edit_ts', 'edit', false, $Blog->ID ) )
+	{	// Display goal tracking and notifications for item with type usage except of content block
+		// and if user has a permission to edit advanced properties of items:
+
 		// ################### GOAL TRACKING ###################
 
 		$Form->begin_fieldset( T_('Goal tracking').get_manual_link( 'post-goal-tracking-panel' )
@@ -1025,8 +1135,6 @@ else
 }
 // New category input box:
 echo_onchange_newcat();
-// Location
-echo_regional_js( 'item', $edited_Item->region_visible() );
 // Goal
 echo_onchange_goal_cat();
 // Fieldset folding
@@ -1035,6 +1143,15 @@ echo_fieldset_folding_js();
 echo_item_content_position_js( get_param( 'content_height' ), get_param( 'content_scroll' ) );
 // JS code for merge button:
 echo_item_merge_js();
+// JS code for link to add new version:
+echo_item_add_version_js();
+// JS code for link to link new version:
+echo_item_link_version_js();
+// JS code for selecting parent item:
+if( $edited_Item->get_type_setting( 'use_parent' ) != 'never' )
+{
+	echo_item_select_parent_js();
+}
 
 // JS to post excerpt mode switching:
 ?>

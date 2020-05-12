@@ -7,7 +7,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}
  *
  * @package admin
  *
@@ -32,6 +32,7 @@ $Form->begin_form( 'fform', T_('Skin properties') );
 	$Form->hidden_ctrl();
 	$Form->hidden( 'action', 'update' );
 	$Form->hidden( 'skin_ID', $edited_Skin->ID );
+	$Form->hidden( 'tab', get_param( 'tab' ) );
 
 	$Form->begin_fieldset( T_('Skin properties').get_manual_link( 'skin-system-settings' ) );
 
@@ -52,16 +53,33 @@ $Form->begin_form( 'fform', T_('Skin properties') );
 				echo '<span>'.( isset( $edited_Skin->version ) ? $edited_Skin->version : 'unknown' ).'</span>';
 			echo '</div>';
 
-			// Skin type
+			// Site Skin:
 			echo '<div class="skin_setting_row">';
-				echo '<label>'.T_('Skin type').':</label>';
+				echo '<label>'.T_('Site Skin').':</label>';
+				echo '<span>'.( $edited_Skin->provides_site_skin() ? T_('Yes') : T_('No') ).'</span>';
+			echo '</div>';
+
+			// Collection Skin:
+			echo '<div class="skin_setting_row">';
+				echo '<label>'.T_('Collection Skin').':</label>';
+				echo '<span>'.( $edited_Skin->provides_collection_skin() ? T_('Yes') : T_('No') ).'</span>';
+			echo '</div>';
+
+			// Skin format:
+			echo '<div class="skin_setting_row">';
+				echo '<label>'.T_('Skin format').':</label>';
 				echo '<span>'.get_skin_type_title( $edited_Skin->type ).'</span>';
 			echo '</div>';
 
 			// Containers
 			if( $skin_containers = $edited_Skin->get_containers() )
 			{
-				$container_ul = '<ul><li>'.implode( '</li><li>', $skin_containers ).'</li></ul>';
+				$skin_containers_names = array();
+				foreach( $skin_containers as $skin_container_data )
+				{
+					$skin_containers_names[] = $skin_container_data[0];
+				}
+				$container_ul = '<ul><li>'.implode( '</li><li>', $skin_containers_names ).'</li></ul>';
 			}
 			else
 			{

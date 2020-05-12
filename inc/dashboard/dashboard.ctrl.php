@@ -7,7 +7,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}
  *
  * @package admin
  *
@@ -33,6 +33,8 @@ if( empty( $_GET['blog'] ) )
 	unset( $Blog, $Collection );
 }
 
+param_action();
+
 // Site dashboard
 $AdminUI->set_path( 'site', 'dashboard' );
 
@@ -55,11 +57,8 @@ require_js_helper( 'colorbox' );
 require_js( '#easypiechart#' );
 require_css( 'jquery/jquery.easy-pie-chart.css' );
 
-// Init JS to quick edit an order of the blogs in the table cell by AJAX
-init_field_editor_js( array(
-		'field_prefix' => 'order-blog-',
-		'action_url' => $admin_url.'?ctrl=dashboard&order_action=update&order_data=',
-	) );
+// Init JS to autcomplete the user logins
+init_autocomplete_login_js( 'rsc_url', $AdminUI->get_template( 'autocomplete_plugin' ) );
 
 // Display <html><head>...</head> section! (Note: should be done early if actions do not redirect)
 $AdminUI->disp_html_head();
@@ -69,21 +68,15 @@ $AdminUI->disp_body_top();
 
 // We're on the GLOBAL tab...
 $AdminUI->disp_payload_begin();
-// Display blog list VIEW:
-$AdminUI->disp_view( 'collections/views/_coll_list.view.php' );
-load_funcs( 'collections/model/_blog_js.funcs.php' );
-$AdminUI->disp_payload_end();
 
-
-/*
- * DashboardGlobalMain to be added here (anyone?)
- */
-if( $current_User->check_perm( 'blogs', 'create' ) )
+$collection_count = get_table_count( 'T_blogs' );
+if( $current_User->check_perm( 'blogs', 'create' ) && $collection_count === 0 )
 {
-	$AdminUI->disp_payload_begin();
-	$AdminUI->disp_view( 'collections/views/_coll_model_list.view.php' );
-	$AdminUI->disp_payload_end();
+	// Display welcome panel:
+	$AdminUI->disp_view( 'collections/views/_welcome_demo_content.view.php' );
 }
+
+$AdminUI->disp_payload_end();
 
 /*
  * Administrative tasks
@@ -114,7 +107,7 @@ if( $current_User->check_perm( 'options', 'edit' ) )
 	// Blogs
 	$chart_data[] = array(
 			'title' => T_('Collections'),
-			'value' => get_table_count( 'T_blogs' ),
+			'value' => $collection_count,
 			'type'  => 'number',
 		);
 	$post_all_counter = get_table_count( 'T_items__item' );

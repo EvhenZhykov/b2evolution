@@ -36,7 +36,7 @@ class tinymce_plugin extends Plugin
 	var $code = 'evo_TinyMCE';
 	var $name = 'TinyMCE';
 	var $priority = 10;
-	var $version = '6.11.4';
+	var $version = '7.1.2';
 	var $group = 'editor';
 	var $number_of_installs = 1;
 
@@ -353,6 +353,11 @@ class tinymce_plugin extends Plugin
 			return false;
 		}
 
+		if( empty( $params['target_object'] ) )
+		{	// Target object must be defined:
+			return false;
+		}
+
 		$params = array_merge( array(
 				'temp_ID' => NULL,
 			), $params );
@@ -369,8 +374,13 @@ class tinymce_plugin extends Plugin
 				$this->target_ID = $edited_Item->ID;
 				$this->temp_ID = $params['temp_ID'];
 
-				if( ! empty( $edited_Item ) && ! $edited_Item->get_type_setting( 'allow_html' ) )
+				if( ! $edited_Item->get_type_setting( 'allow_html' ) )
 				{	// Only when HTML is allowed in post:
+					return false;
+				}
+
+				if( $edited_Item->get_type_setting( 'use_text' ) == 'never' )
+				{	// Only when text is allowed for current item type:
 					return false;
 				}
 
@@ -433,7 +443,7 @@ class tinymce_plugin extends Plugin
 				$item_Blog = & $edited_Item->get_Blog();
 
 				if( $edited_Comment->is_meta() )
-				{	// Do not use TinyMCE for meta comments, never!
+				{	// Do not use TinyMCE for internal comments, never!
 					return false;
 				}
 
@@ -627,9 +637,9 @@ class tinymce_plugin extends Plugin
 							jQuery( '#tinymce_plugin_toggle_button_html' ).removeAttr( 'disabled' );
 							jQuery( '[name="editor_code"]').attr('value', '<?php echo $this->code; ?>' );
 							// Hide the plugin toolbars that allow to insert html tags
-							jQuery( '.quicktags_toolbar, .evo_code_toolbar, .evo_prism_toolbar, .b2evMark_toolbar' ).hide();
-							jQuery( '#block_renderer_evo_code, #block_renderer_evo_prism, #block_renderer_b2evMark' ).addClass( 'disabled' );
-							jQuery( 'input#renderer_evo_code, input#renderer_evo_prism, input#renderer_b2evMark' ).each( function()
+							jQuery( '.quicktags_toolbar, .evo_code_toolbar, .evo_prism_toolbar, .b2evMark_toolbar, .evo_mermaid_toolbar' ).hide();
+							jQuery( '#block_renderer_evo_code, #block_renderer_evo_prism, #block_renderer_b2evMark, #block_renderer_evo_mermaid' ).addClass( 'disabled' );
+							jQuery( 'input#renderer_evo_code, input#renderer_evo_prism, input#renderer_b2evMark, input#renderer_evo_mermaid' ).each( function()
 							{
 								if( jQuery( this ).is( ':checked' ) )
 								{
@@ -652,9 +662,9 @@ class tinymce_plugin extends Plugin
 							jQuery( '#tinymce_plugin_toggle_button_wysiwyg' ).removeAttr( 'disabled' );
 							jQuery( '[name="editor_code"]' ).attr( 'value', 'html' );
 							// Show the plugin toolbars that allow to insert html tags
-							jQuery( '.quicktags_toolbar, .evo_code_toolbar, .evo_prism_toolbar, .b2evMark_toolbar' ).show();
-							jQuery( '#block_renderer_evo_code, #block_renderer_evo_prism, #block_renderer_b2evMark' ).removeClass( 'disabled' );
-							jQuery( 'input#renderer_evo_code, input#renderer_evo_prism, input#renderer_b2evMark' ).each( function()
+							jQuery( '.quicktags_toolbar, .evo_code_toolbar, .evo_prism_toolbar, .b2evMark_toolbar, .evo_mermaid_toolbar' ).show();
+							jQuery( '#block_renderer_evo_code, #block_renderer_evo_prism, #block_renderer_b2evMark, #block_renderer_evo_mermaid' ).removeClass( 'disabled' );
+							jQuery( 'input#renderer_evo_code, input#renderer_evo_prism, input#renderer_b2evMark, input#renderer_evo_mermaid' ).each( function()
 							{
 								if( jQuery( this ).hasClass( 'checked' ) )
 								{

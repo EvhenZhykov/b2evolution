@@ -7,7 +7,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}
  * Parts of this file are copyright (c)2004-2006 by Daniel HAHLER - {@link http://thequod.de/contact}.
  *
  * @package admin
@@ -373,7 +373,8 @@ if( $notifications_mode != 'off' )
 				LEFT JOIN T_users__secondary_user_groups ON (sug_grp_ID = bloggroup_group_ID AND sug_user_ID = '.$edited_User->ID.' AND opt.cset_value = "1" )
 				WHERE ( sug_user_ID = '.$edited_User->ID.' OR bloguser_user_ID = '.$edited_User->ID.' OR user_ID = '.$edited_User->ID.' OR isub_user_ID = '.$edited_User->ID.' )
 					AND ( sub.cset_value = "1" OR sub.cset_coll_ID IS NULL )
-					AND ( isub_comments <> 0 OR isub_item_ID IS NULL )';
+					AND ( isub_comments <> 0 OR isub_item_ID IS NULL )
+				ORDER BY blog_ID ASC, post_last_touched_ts DESC, post_ID DESC';
 		$individual_posts_subs = $DB->get_results( $sql );
 		$subs_item_IDs = array();
 		if( empty( $individual_posts_subs ) )
@@ -387,6 +388,7 @@ if( $notifications_mode != 'off' )
 
 			$Form->info_field( '', T_( 'You are subscribed to be notified of all new comments on the following posts' ).':', array( 'class' => 'info_full' ) );
 			$blog_name = NULL;
+			$post_counter = 0;
 			foreach( $individual_posts_subs as $row )
 			{
 				if( ! ( $Item = $ItemCache->get_by_ID( $row->post_ID, false, false ) ) )
@@ -398,10 +400,16 @@ if( $notifications_mode != 'off' )
 				{
 					if( !empty( $blog_name ) )
 					{
+						if( !empty( $subs_group[$blog_name] ) )
+						{
+							$post_subs[] = array( 'item_grp_sub[]', implode( ',', $subs_group[$blog_name] ),
+									sprintf( T_('+%d older posts'), count( $subs_group[$blog_name] ) ), 1,	$disabled );
+						}
 						$Form->checklist( $post_subs, 'item_subscriptions', $blog_name );
 					}
 					$blog_name = $row->blog_shortname;
 					$post_subs = array();
+					$post_counter = 0;
 				}
 				if( is_admin_page() && $current_User->check_perm( 'item_post!CURSTATUS', 'view', false, $Item ) )
 				{ // Link title to back-office if user has a permission
@@ -411,13 +419,31 @@ if( $notifications_mode != 'off' )
 				{ // Link title to front-office
 					$item_title = $Item->get_permanent_link( '#title#' );
 				}
-				$post_subs[] = array( 'item_sub_'.$row->post_ID, 1, $item_title, 1, $disabled );
+
+				if( $post_counter < 20 ) // Maximum number of items/posts to display
+				{
+					$post_subs[] = array( 'item_sub_'.$row->post_ID, 1, $item_title, 1, $disabled );
+				}
+				else
+				{
+					if( !isset($subs_group[$blog_name] ) )
+					{
+						$subs_group[$blog_name] = array();
+					}
+					$subs_group[$blog_name][] = $row->post_ID;
+				}
+				$post_counter++;
 			}
 			// display individual post subscriptions from the last Blog
+			if( !empty( $subs_group[$blog_name] ) )
+			{
+				$post_subs[] = array( 'item_grp_sub[]', implode( ',', $subs_group[$blog_name] ),
+						sprintf( T_('+%d older posts'), count( $subs_group[$blog_name] ) ), 1,	$disabled );
+			}
 			$Form->checklist( $post_subs, 'item_subscriptions', $blog_name );
 		}
 		$Form->hidden( 'subs_item_IDs', implode( ',', $subs_item_IDs ) );
-		$Form->info_field( '', T_( 'To subscribe to notifications on a specifc post, go to that post and click "Notify me when someone comments" at the end of the comment list.' ), array( 'class' => 'info_full' ) );
+		$Form->info_field( '', T_( 'To subscribe to notifications on a specifc post, go to that post and click "Notify me by email when someone comments here." at the end of the comment list.' ), array( 'class' => 'info_full' ) );
 
 	$Form->end_fieldset();
 }
@@ -450,8 +476,8 @@ $Form->begin_fieldset( T_('Receiving notifications').( is_admin_page() ? get_man
 	}
 	if( $edited_User->check_perm( 'admin', 'restricted', false ) )
 	{ // edited user has a permission to back-office
-		$notify_options[ T_('Comments') ][] = array( 'edited_user_notify_meta_comment_mentioned', 1, T_( 'I have been mentioned on a meta comment.' ), $UserSettings->get( 'notify_meta_comment_mentioned', $edited_User->ID ) );
-		$notify_options[ T_('Comments') ][] = array( 'edited_user_notify_meta_comments', 1, T_('a meta comment is posted.'), $UserSettings->get( 'notify_meta_comments', $edited_User->ID ), $disabled );
+		$notify_options[ T_('Comments') ][] = array( 'edited_user_notify_meta_comment_mentioned', 1, T_( 'I have been mentioned on an internal comment.' ), $UserSettings->get( 'notify_meta_comment_mentioned', $edited_User->ID ) );
+		$notify_options[ T_('Comments') ][] = array( 'edited_user_notify_meta_comments', 1, T_('an internal comment is posted.'), $UserSettings->get( 'notify_meta_comments', $edited_User->ID ), $disabled );
 	}
 	$notify_options[ T_('Posts') ][] = array( 'edited_user_notify_post_mentioned', 1, T_( 'I have been mentioned on a post.' ), $UserSettings->get( 'notify_post_mentioned', $edited_User->ID ) );
 	if( $edited_User->check_role( 'post_moderator' ) )

@@ -4,7 +4,7 @@
  *
  * b2evolution - {@link http://b2evolution.net/}
  * Released under GNU GPL License - {@link http://b2evolution.net/about/gnu-gpl-license}
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}
  *
  * @package admin
  *
@@ -58,11 +58,6 @@ $Results = new Results( $SQL->get(), 'colluser_' );
 // Tell the Results class that we already have a form for this page:
 $Results->Form = & $Form;
 
-if( ! empty( $keywords ) )
-{ // Display a button to reset the filters
-	$Results->global_icon( T_('Reset all filters!'), 'reset_filters', $admin_url.'?ctrl=coll_settings&amp;tab=perm&amp;blog='.$edited_Blog->ID, T_('Reset filters'), 3, 3, array( 'class' => 'action_icon btn-warning' ) );
-}
-
 // Button to export user permissions into CSV file:
 $Results->global_icon( T_('Export CSV'), '', $admin_url.'?ctrl=coll_settings&amp;action=export_userperms&amp;blog='.$edited_Blog->ID.( empty( $keywords ) ? '' : '&amp;keywords='.urlencode( $keywords ) ), T_('Export CSV'), 3, 3, array( 'class' => 'action_icon btn-default' ) );
 
@@ -72,10 +67,9 @@ $Results->filter_area = array(
 	'submit' => 'actionArray[filter1]',
 	'callback' => 'filter_collobjectlist',
 	'url_ignore' => 'results_colluser_page,keywords1,keywords2',
-	'presets' => array(
-		'all' => array( T_('All users'), regenerate_url( 'action,results_colluser_page,keywords1,keywords2', 'action=edit' ) ),
-		)
 	);
+
+$Results->register_filter_preset( 'all', T_('All users'), '?ctrl=coll_settings&amp;tab=perm&amp;blog='.$edited_Blog->ID );
 
 /*
  * Grouping params:
@@ -111,7 +105,12 @@ $Results->cols[] = array(
 						'th' => /* TRANS: SHORT table header on TWO lines */ sprintf( T_('Member of<br />%s'), $edited_Blog->get( 'shortname' ) ),
 						'th_class' => 'checkright',
 						'td' => '%coll_perm_checkbox( {row}, \'bloguser_\', \'ismember\', \''.format_to_output( T_('Permission to read members posts'), 'htmlattr' ).'\', \'checkallspan_state_$user_ID$\' )%'.
-						( $edited_Blog->get_setting( 'use_workflow' ) ? '%coll_perm_checkbox( {row}, \'bloguser_\', \'can_be_assignee\', \''.format_to_output( T_('Items can be assigned to this user'), 'htmlattr' ).'\', \'checkallspan_state_$user_ID$\' )%' : '' ),
+						( $edited_Blog->get_setting( 'use_workflow' )
+							? ' %coll_perm_checkbox( {row}, \'bloguser_\', \'can_be_assignee\', \''.format_to_output( T_('Workflow Member (Items can be assigned to this User)'), 'htmlattr' ).'\', \'checkallspan_state_$user_ID$\' )%'
+							 .' %coll_perm_checkbox( {row}, \'bloguser_\', \'workflow_status\', \''.format_to_output( T_('User can change task status'), 'htmlattr' ).'\', \'checkallspan_state_$user_ID$\' )%'
+							 .' %coll_perm_checkbox( {row}, \'bloguser_\', \'workflow_user\', \''.format_to_output( T_('User can assign items to others'), 'htmlattr' ).'\', \'checkallspan_state_$user_ID$\' )%'
+							 .' %coll_perm_checkbox( {row}, \'bloguser_\', \'workflow_priority\', \''.format_to_output( T_('User can set priority / deadline'), 'htmlattr' ).'\', \'checkallspan_state_$user_ID$\' )%'
+							: '' ),
 						'td_class' => 'center',
 					);
 
@@ -168,7 +167,7 @@ $Results->cols[] = array(
 
 $Results->cols[] = array(
 						'th_group' => T_('Permissions on Posts'),
-						'th' => /* TRANS: SHORT table header on TWO lines */ T_('Edit<br />TS'),
+						'th' => /* TRANS: SHORT table header on TWO lines */ T_('Adv.<br />Edit'),
 						'th_class' => 'checkright',
 						'order' => 'bloguser_perm_edit_ts',
 						'default_dir' => 'D',
@@ -189,7 +188,7 @@ $Results->cols[] = array(
 								'%coll_perm_status_checkbox( {row}, \'bloguser_\', \'draft\', \''.format_to_output( T_('Permission to comment into this blog with draft status'), 'htmlattr' ).'\', \'comment\' )%'.
 								'%coll_perm_status_checkbox( {row}, \'bloguser_\', \'deprecated\', \''.format_to_output( T_('Permission to comment into this blog with deprecated status'), 'htmlattr' ).'\', \'comment\' )%'.
 								'<span style="display: inline-block; min-width: 5px;"></span>'.
-								'%coll_perm_checkbox( {row}, \'bloguser_\', \'perm_meta_comment\', \''.format_to_output( T_('Permission to post meta comments on this collection'), 'htmlattr' ).'\' )%',
+								'%coll_perm_checkbox( {row}, \'bloguser_\', \'perm_meta_comment\', \''.format_to_output( T_('Permission to post internal comments on this collection'), 'htmlattr' ).'\' )%',
 						'td_class' => 'center',
 					);
 

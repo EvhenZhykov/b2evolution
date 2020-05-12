@@ -7,7 +7,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}.
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}.
  * Parts of this file are copyright (c)2005 by Daniel HAHLER - {@link http://thequod.de/contact}.
  *
  * @package admin
@@ -151,7 +151,7 @@ $Form->output = true;
 $Form->switch_layout( NULL );
 
 $Form->end_form( array(
-		array( 'submit', 'submit', ( $creating ? T_('Record') : T_('Save Changes!') ), 'SaveButton' )
+		array( 'submit', 'submit', ( $creating ? T_('Record') : T_('Save Changes!') ), 'SaveButton', 'data-shortcut' => 'ctrl+s,command+s,ctrl+enter,command+enter' )
 	) );
 
 if( ! $creating && $display_mode != 'js' )
@@ -460,6 +460,21 @@ jQuery( document ).ready( function()
 				10: '<?php echo TS_('October'); ?>',
 				11: '<?php echo TS_('November'); ?>',
 				12: '<?php echo TS_('December'); ?>'
+			}
+		},
+		{
+			id: 'days_before_birthday',
+			label: '<?php echo TS_('Days before birthday'); ?>',
+			type: 'integer',
+			operators: operators_default,
+			input: 'select',
+			values: {
+			<?php
+				for( $i = 0; $i <= 365; $i++ )
+				{
+					echo $i.': \''.format_to_js( $i ).'\', ';
+				}
+			?>
 			}
 		},
 		{

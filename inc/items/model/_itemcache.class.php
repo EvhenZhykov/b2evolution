@@ -7,7 +7,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}
  * Parts of this file are copyright (c)2004-2006 by Daniel HAHLER - {@link http://thequod.de/contact}.
  *
  * @package evocore
@@ -170,6 +170,7 @@ class ItemCache extends DataObjectCache
 		$ItemQuery->where_visibility( $visibility_statuses );
 		$ItemQuery->where_datestart( NULL, NULL, NULL, NULL, $Blog->get_timestamp_min(), $Blog->get_timestamp_max() );
 		$ItemQuery->where_itemtype_usage( 'post' );
+		$ItemQuery->where_locale_visibility();
 
 		// Clear previous items from the cache and load by the defined SQL
 		$this->clear( true );

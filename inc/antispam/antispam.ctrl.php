@@ -7,7 +7,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}.
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}.
  * Parts of this file are copyright (c)2004 by Vegar BERG GULDAL - {@link http://funky-m.com/}.
  *
  * @package admin
@@ -487,11 +487,12 @@ if( $display_mode != 'js' )
 			if( $current_User->check_perm( 'stats', 'view' ) )
 			{
 				$AdminUI->set_coll_list_params( 'stats', 'view', array( 'ctrl' => 'antispam', 'tab' => $tab, 'tab3' => $tab3 ), T_('All'),
-								$admin_url.'?ctrl=antispam&amp;tab='.$tab.'&amp;tab3='.$tab3.'&amp;blog=0' );
+								$admin_url.'?ctrl=antispam&amp;tab='.$tab.'&amp;tab3='.$tab3.'&amp;blog=0', NULL, false, true );
 			}
 			else
 			{ // No permission to view aggregated stats:
-				$AdminUI->set_coll_list_params( 'stats', 'view', array( 'ctrl' => 'antispam', 'tab' => $tab, 'tab3' => $tab3 ) );
+				$AdminUI->set_coll_list_params( 'stats', 'view', array( 'ctrl' => 'antispam', 'tab' => $tab, 'tab3' => $tab3 ), NULL,
+						'', NULL, false, true );
 			}
 		}
 		$AdminUI->breadcrumbpath_init( true, array( 'text' => T_('Analytics'), 'url' => '?ctrl=stats&amp;blog=$blog$' ) );
@@ -514,6 +515,7 @@ if( $display_mode != 'js' )
 	{
 		case 'settings':
 			$AdminUI->breadcrumbpath_add( T_('Settings'), '?ctrl=antispam&amp;tab3='.$tab3 );
+			init_hotkeys_js();
 
 			// Set an url for manual page:
 			$AdminUI->set_page_manual_link( 'antispam-settings' );
@@ -598,6 +600,8 @@ if( in_array( $action, array( 'iprange_edit' ) ) )
 	init_datepicker_js();
 	// Load jQuery QueryBuilder plugin files for user list filters:
 	init_querybuilder_js( 'rsc_url' );
+	// Initialize Hotkeys
+	init_hotkeys_js();
 }
 
 // Display <html><head>...</head> section! (Note: should be done early if actions do not redirect)

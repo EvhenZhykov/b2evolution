@@ -6,7 +6,7 @@
  *
  * b2evolution - {@link http://b2evolution.net/}
  * Released under GNU GPL License - {@link http://b2evolution.net/about/gnu-gpl-license}
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}
  *
  * @package evoskins
  */
@@ -29,11 +29,11 @@ $params = array_merge( array(
 		'comment_body_before'   => '<div class="panel-body">',
 		'comment_body_after'    => '</div>',
 
-		'comment_avatar_before' => '<span class="evo_comment_avatar col-md-1 col-sm-2">',
+		'comment_avatar_before' => '<span class="evo_comment_avatar'.( $Skin->get_setting( 'voting_place' ) == 'under_content' ? ' col-md-1 col-sm-2' : '' ).'">',
 		'comment_avatar_after'  => '</span>',
 		'comment_rating_before' => '<div class="evo_comment_rating">',
 		'comment_rating_after'  => '</div>',
-		'comment_text_before'   => '<div class="evo_comment_text col-md-11 col-sm-10">',
+		'comment_text_before'   => '<div class="evo_comment_text'.( $Skin->get_setting( 'voting_place' ) == 'under_content' ? ' col-md-11 col-sm-10' : '' ).'">',
 		'comment_text_after'    => '</div>',
 		'link_to'               => 'userurl>userpage', // 'userpage' or 'userurl' or 'userurl>userpage' or 'userpage>userurl'
 		'author_link_text'      => 'auto', // avatar_name | avatar_login | only_avatar | name | login | nickname | firstname | lastname | fullname | preferredname
@@ -76,7 +76,11 @@ $Comment->get_Item();
 $Comment->anchor();
 
 echo update_html_tag_attribs( $params['comment_start'], array(
-		'class' => 'vs_'.$Comment->status.( $Comment->is_meta() ? ' evo_comment__meta' : '' ), // Add style class for proper comment status
+		'class' =>
+			// Add style class for proper comment status:
+			'vs_'.$Comment->status.( $Comment->is_meta() ? ' evo_comment__meta' : '' ).' '.
+			// Add style for voting place mode:
+			'evo_voting_layout__'.$Skin->get_setting( 'voting_place' ),
 		'id'    => 'comment_'.$Comment->ID // Add id to know what comment is used on AJAX status changing
 	), array( 'id' => 'skip' ) );
 
@@ -135,9 +139,9 @@ switch( $Comment->get( 'type' ) )
 
 	// ON *DISP = SINGLE* SHOW THE FOLLOWING TITLE FOR EACH COMMENT
 	case 'comment': // Display a comment:
-	case 'meta': // Display a meta comment:
+	case 'meta': // Display an internal comment:
 		if( $Comment->is_meta() )
-		{	// Meta comment:
+		{	// Internal comment:
 			$permalink_text = $Comment->get_inlist_order();
 			$permalink_class = 'badge badge-info';
 		}
@@ -234,12 +238,19 @@ echo $params['comment_body_before'];
 
 // Avatar:
 echo $params['comment_avatar_before'];
-$Comment->author2( array(
-					'link_text'  => 'only_avatar',
-					'thumb_size' => 'crop-top-80x80',
-					'after_user' => '', // After registered user
-					'after'      => '', // After anonymous user
-				) );
+if( $Skin->get_setting( 'voting_place' ) == 'left_score' && ! $Comment->is_meta() )
+{	// Display voting panel instead of author avatar:
+	$Skin->display_comment_voting_panel( $Comment, 'left_score' );
+}
+else
+{	// Display author avatar:
+	$Comment->author2( array(
+			'link_text'  => 'only_avatar',
+			'thumb_size' => 'crop-top-80x80',
+			'after_user' => '', // After registered user
+			'after'      => '', // After anonymous user
+		) );
+}
 echo $params['comment_avatar_after'];
 
 // Rating:
@@ -284,14 +295,14 @@ echo $params['comment_body_after'];
 	}
 	if( $bbcode_plugin_is_enabled && $commented_Item && $commented_Item->can_comment( NULL ) )
 	{ // Display button to quote this comment
-		echo '<a href="'.$commented_Item->get_permanent_url().'?mode=quote&amp;qc='.$Comment->ID.'#form_p'.$commented_Item->ID.'" title="'.T_('Reply with quote').'" class="'.button_class( 'text' ).' pull-left quote_button">'.get_icon( 'comments', 'imgtag', array( 'title' => T_('Reply with quote') ) ).' '.T_('Quote').'</a>';
+		echo '<a href="'.$commented_Item->get_permanent_url().'?quote_comment='.$Comment->ID.'#form_p'.$commented_Item->ID.'" title="'.format_to_output( T_('Reply with quote'), 'htmlattr' ).'" class="'.button_class( 'text' ).' pull-left quote_button">'.get_icon( 'comments', 'imgtag', array( 'title' => T_('Reply with quote') ) ).' '.T_('Quote').'</a>';
 	}
 
 	$Comment->reply_link( ' ', ' ', '#', '#', 'pull-left' ); /* Link for replying to the Comment */
 
 	if( $params['display_vote_helpful'] )
 	{	// Display a voting panel for comment:
-		$Skin->display_comment_voting_panel( $Comment );
+		$Skin->display_comment_voting_panel( $Comment, 'under_content' );
 	}
 
 	// Display Spam Voting system

@@ -21,9 +21,9 @@ class evopress_Skin extends Skin
 	 * Skin version
 	 * @var string
 	 */
-	var $version = '6.11.4';
+	var $version = '7.1.2';
 
-  /**
+	/**
 	 * Get default name for the skin.
 	 * Note: the admin can customize it.
 	 */
@@ -33,7 +33,19 @@ class evopress_Skin extends Skin
 	}
 
 
-  /**
+	/**
+	 * What evoSkins API does has this skin been designed with?
+	 *
+	 * This determines where we get the fallback templates from (skins_fallback_v*)
+	 * (allows to use new markup in new b2evolution versions)
+	 */
+	function get_api_version()
+	{
+		return 5;
+	}
+
+
+	/**
 	 * Get default type for the skin.
 	 */
 	function get_default_type()
@@ -71,6 +83,34 @@ class evopress_Skin extends Skin
 
 
 	/**
+	 * Get the container codes of the skin main containers
+	 *
+	 * This should NOT be protected. It should be used INSTEAD of file parsing.
+	 * File parsing should only be used if this function is not defined
+	 *
+	 * @return array Array which overrides default containers; Empty array means to use all default containers.
+	 */
+	function get_declared_containers()
+	{
+		// Array to override default containers from function get_skin_default_containers():
+		// - Key is widget container code;
+		// - Value: array( 0 - container name, 1 - container order ),
+		//          NULL - means don't use the container, WARNING: it(only empty/without widgets) will be deleted from DB on changing of collection skin or on reload container definitions.
+		return array(
+				'front_page_secondary_area' => NULL,
+				'item_list'                 => NULL,
+				'item_in_list'              => NULL,
+				'item_single_header'        => NULL,
+				'item_page'                 => NULL,
+				'sidebar_2'                 => NULL,
+				'footer'                    => NULL,
+				'user_profile_left'         => NULL,
+				'user_profile_right'        => NULL,
+			);
+	}
+
+
+	/**
 	 * Get definitions for editable params
 	 *
 	 * @see Plugin::GetDefaultSettings()
@@ -81,13 +121,11 @@ class evopress_Skin extends Skin
 		$r = array_merge( array(
 				'head_bg_color_top' => array(
 					'label' => T_('Header gradient top color'),
-					'note' => T_('E-g: #ff0000 for red'),
 					'defaultvalue' => '#6aace6',
 					'type' => 'color',
 				),
 				'head_bg_color_bottom' => array(
 					'label' => T_('Header gradient bottom color'),
-					'note' => T_('E-g: #00ff00 for green'),
 					'defaultvalue' => '#4280b6',
 					'type' => 'color',
 				),

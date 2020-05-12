@@ -4,7 +4,7 @@
  *
  * b2evolution - {@link http://b2evolution.net/}
  * Released under GNU GPL License - {@link http://b2evolution.net/about/gnu-gpl-license}
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}
  *
  * @package admin
  * @author fplanque: Francois PLANQUE.
@@ -17,13 +17,15 @@ $current_User->check_perm( 'admin', 'normal', true );
 $current_User->check_perm( 'options', 'edit', true );
 
 load_funcs( 'tools/model/_wp.funcs.php' );
+load_class( 'tools/model/_wordpressimport.class.php', 'WordpressImport' );
 
 /**
  * @var action
  *
  * values:
  * 1) 'file'
- * 2) 'import'
+ * 2) 'confirm'
+ * 3) 'import'
  */
 param( 'action', 'string' );
 
@@ -34,33 +36,33 @@ if( !empty( $action ) )
 	@ini_set( 'output_buffering', 'off' );
 }
 
+if( param( 'wp_blog_ID', 'integer', 0, true ) > 0 )
+{	// Save last import collection in Session:
+	$Session->set( 'last_import_coll_ID', get_param( 'wp_blog_ID' ) );
+
+	// Save last used import controller in Session:
+	$Session->set( 'last_import_controller_'.get_param( 'wp_blog_ID' ), 'xml' );
+}
 
 switch( $action )
 {
+	case 'confirm':
 	case 'import':
 		// Check that this action request is not a CSRF hacked request:
 		$Session->assert_received_crumb( 'wpxml' );
 
-		$wp_blog_ID = param( 'wp_blog_ID', 'integer', 0 );
-		param_check_not_empty( 'wp_blog_ID', 'Please select a collection!' );
+		$WordpressImport = new WordpressImport();
 
-		// XML File
-		$xml_file = param( 'import_file', 'string', '' );
-		if( empty( $xml_file ) )
-		{ // File is not selected
-			param_error( 'import_file', 'Please select file to import.' );
-		}
-		else if( ! preg_match( '/\.(xml|txt|zip)$/i', $xml_file ) )
-		{ // Extension is incorrect
-			param_error( 'import_file', sprintf( '&laquo;%s&raquo; has an unrecognized extension.', $xml_file ) );
+		// Load import data from request:
+		if( ! $WordpressImport->load_from_Request() )
+		{	// Don't import if errors have been detected:
+			$action = ( $action == 'confirm' ? 'file' : 'confirm' );
 		}
 
-		if( param_errors_detected() )
-		{ // Stop import if errors exist
-			$action = 'file';
-			break;
+		if( $action == 'confirm' )
+		{	// Don't log into file for the confirm screen before start importing:
+			$WordpressImport->log_file = false;
 		}
-
 		break;
 }
 
@@ -89,7 +91,11 @@ $AdminUI->disp_payload_begin();
 
 switch( $action )
 {
-	case 'import':	// Step 2
+	case 'confirm':	// Step 2
+		$AdminUI->disp_view( 'tools/views/_wpxml_confirm.form.php' );
+		break;
+
+	case 'import':	// Step 3
 		$AdminUI->disp_view( 'tools/views/_wpxml_import.form.php' );
 		break;
 

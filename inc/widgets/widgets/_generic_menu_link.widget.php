@@ -7,7 +7,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}
  *
  * @package evocore
  */
@@ -25,6 +25,9 @@ load_class( 'widgets/model/_widget.class.php', 'ComponentWidget' );
  */
 class generic_menu_link_Widget extends ComponentWidget
 {
+	// Enable additional params for classes of Link/Button:
+	var $allow_link_css_params = true;
+
 	/**
 	 * Get a layout for menu link
 	 *
@@ -34,16 +37,20 @@ class generic_menu_link_Widget extends ComponentWidget
 	 * @param string Link template, possible masks: $link_url$, $link_class$, $link_text$
 	 * @return string
 	 */
-	function get_layout_menu_link( $link_url, $link_text, $is_active_link, $link_template = '<a href="$link_url$" class="$link_class$">$link_text$</a>' )
+	function get_layout_menu_link( $link_url, $link_text, $is_active_link, $link_template = NULL )
 	{
-		$r = $this->disp_params['block_start'];
-		$r .= $this->disp_params['block_body_start'];
+		if( $link_template === NULL )
+		{	// Use default template:
+			$link_template = '<a href="$link_url$" class="$link_class$">$link_text$</a>';
+		}
+
+		$r = '';
 
 		// Are we displaying a link in a list or a standalone button?
 		// "Menu" Containers are 'inlist'. Some sub-containers will also be 'inlist' (displaying a local menu).
 		// fp> Maybe this should be moved up to container level? 
 		$inlist = $this->disp_params['inlist'];
-		if( $inlist == 'auto' )
+		if( $inlist === 'auto' )
 		{
 			if( empty( $this->disp_params['list_start'] ) )
 			{	// We're not starting a list. This means (very high probability) that we are already in a list:
@@ -65,17 +72,25 @@ class generic_menu_link_Widget extends ComponentWidget
 			{	// Use template and class to highlight current menu item:
 				$r .= $this->disp_params['item_selected_start'];
 				$link_class = $this->disp_params['link_selected_class'];
+				if( ! empty( $this->disp_params['widget_active_link_class'] ) )
+				{
+					$link_class .= ' '.$this->disp_params['widget_active_link_class'];
+				}
 			}
 			else
 			{	// Use normal template:
 				$r .= $this->disp_params['item_start'];
 				$link_class = $this->disp_params['link_default_class'];
+				if( ! empty( $this->disp_params['widget_link_class'] ) )
+				{
+					$link_class .= ' '.$this->disp_params['widget_link_class'];
+				}
 			}
 
 			// Get a link from template:
 			$r .= str_replace(
 				array( '$link_url$', '$link_class$', '$link_text$' ),
-				array( $link_url, $link_class, $link_text ),
+				array( $link_url, trim( $link_class ), $link_text ),
 				$link_template );
 
 			if( $is_active_link )
@@ -94,11 +109,11 @@ class generic_menu_link_Widget extends ComponentWidget
 
 			if( $is_active_link )
 			{	// Use template and class to highlight current menu item:
-				$button_class = $this->disp_params['button_selected_class'];
+				$button_class = empty( $this->disp_params['widget_active_link_class'] ) ? $this->disp_params['button_selected_class'] : $this->disp_params['widget_active_link_class'];
 			}
 			else
 			{	// Use normal template:
-				$button_class = $this->disp_params['button_default_class'];
+				$button_class = empty( $this->disp_params['widget_link_class'] ) ? $this->disp_params['button_default_class'] : $this->disp_params['widget_link_class'];
 			}
 
 			// Get a button from template:
@@ -108,9 +123,52 @@ class generic_menu_link_Widget extends ComponentWidget
 				$link_template );
 		}
 
+		return $r;
+	}
+
+
+	/**
+	 * Get a layout for standalone menu link
+	 *
+	 * @param string Link URL
+	 * @param string Link text
+	 * @param boolean Is active menu link?
+	 * @param string Link template, possible masks: $link_url$, $link_class$, $link_text$
+	 * @return string
+	 */
+	function get_layout_standalone_menu_link( $link_url, $link_text, $is_active_link, $link_template = NULL )
+	{
+		$r = $this->disp_params['block_start'];
+		$r .= $this->disp_params['block_body_start'];
+
+		$r .= $this->get_layout_menu_link( $link_url, $link_text, $is_active_link, $link_template );
+
 		$r .= $this->disp_params['block_body_end'];
 		$r .= $this->disp_params['block_end'];
 
 		return $r;
+	}
+
+
+	/**
+	 * Display debug message e-g on designer mode when we need to show widget when nothing to display currently
+	 *
+	 * @param string Message
+	 */
+	function display_debug_message( $message = NULL )
+	{
+		if( $this->mode == 'designer' )
+		{	// Display message on designer mode:
+			if( $message === NULL )
+			{	// Set default message:
+				$message = 'Hidden';
+				if( ! empty( $this->disp_params['link_type'] ) )
+				{
+					$message .= '('.$this->disp_params['link_type'].')';
+				}
+			}
+
+			echo $this->get_layout_standalone_menu_link( '#', $message, false );
+		}
 	}
 }

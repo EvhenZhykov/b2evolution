@@ -12,6 +12,10 @@ if( empty( $user_tab ) )
 {
 	$user_tab = 'profile';
 }
+elseif( $user_tab == 'social' && ! is_pro() )
+{	// Don't allow social accounts tabs for non-PRO:
+	$user_tab = 'profile';
+}
 
 $AdminUI->set_path( 'users', 'users' );
 
@@ -77,7 +81,7 @@ if( ! is_null( $user_ID ) )
 		    && $edited_User->ID != $current_User->ID )
 		{ // user is only allowed to _view_ other user's profiles
 			$Messages->add( T_('You have no permission to edit other users!'), 'error' );
-			if( in_array( $user_tab, array( 'pwdchange', 'marketing', 'admin', 'sessions', 'activity' ) ) )
+			if( in_array( $user_tab, array( 'pwdchange', 'marketing', 'admin', 'sessions', 'activity', 'social' ) ) )
 			{	// Don't allow the restricted pages for view:
 				$user_tab = 'profile';
 			}
@@ -129,6 +133,7 @@ if( !$Messages->has_errors() )
 			else
 			{ // We use an empty user:
 				$edited_User = new User();
+				$edited_User->set( 'status', 'manualactivated' );
 			}
 			break;
 
@@ -439,6 +444,16 @@ if( !$Messages->has_errors() )
 				$UserList = new UserList( 'admin' );
 				$UserList->refresh_query = true;
 				$UserList->query();
+
+				if( param( 'send_pass_email', 'integer', 0 ) )
+				{	// Inform new created user by email:
+					locale_temp_switch( $edited_User->get( 'locale' ) );
+					send_mail_to_User( $edited_User->ID, sprintf( T_('Your new account on %s'), $Settings->get( 'notification_short_name' ) ), 'new_account_password_info', array(
+							'login'    => $edited_User->get( 'login' ),
+							'password' => get_param( 'edited_user_pass1' ),
+						), true );
+					locale_restore_previous();
+				}
 
 				header_redirect( regenerate_url( 'ctrl,action', 'ctrl=users&action=list', '', '&' ), 303 );
 			}
@@ -970,6 +985,18 @@ if( $display_mode != 'js')
 			require_js( '#jcrop#', 'rsc_url' );
 			require_css( '#jcrop_css#', 'rsc_url' );
 			break;
+		case 'social':
+			if( is_pro() )
+			{
+				// We need to initiate session now before sending any output to the browser for HybridAuth to work:
+				session_start();
+
+				$AdminUI->breadcrumbpath_add( T_('Social Accounts'), '?ctrl=user&amp;user_ID='.$edited_User->ID.'&amp;user_tab='.$user_tab );
+
+				// Set an url for manual page:
+				$AdminUI->set_page_manual_link( 'user-social-tab' );
+			}
+			break;
 		case 'pwdchange':
 			// Check and redirect if current URL must be used as https instead of http:
 			check_https_url( 'login' );
@@ -1040,6 +1067,15 @@ if( $display_mode != 'js')
 			// Set an url for manual page:
 			$AdminUI->set_page_manual_link( 'user-activity-tab' );
 			break;
+		default:
+			// Display back-office UI for modules:
+			modules_call_method( 'init_backoffice_UI', array(
+					'ctrl'    => 'user',
+					'action'  => $action,
+					'tab'     => $user_tab,
+					'user_ID' => $edited_User->ID,
+				) );
+			break;
 	}
 
 	// Display messages depending on user email status
@@ -1091,6 +1127,15 @@ switch( $action )
 					$AdminUI->disp_view( 'users/views/_user_avatar.form.php' );
 					// Init JS for form to crop pictures of user
 					echo_user_crop_avatar_window();
+					$AdminUI->disp_payload_end();
+				}
+				break;
+			case 'social':
+				// Display social accounts form:
+				if( is_pro() )
+				{	// Social Accounts tab available to PRO version only:
+					$AdminUI->disp_payload_begin();
+					$AdminUI->disp_view( 'users/views/_user_social.form.php' );
 					$AdminUI->disp_payload_end();
 				}
 				break;
@@ -1357,6 +1402,15 @@ switch( $action )
 				{
 					$AdminUI->disp_payload_end();
 				}
+				break;
+
+			default:
+				// Display back-office UI for modules:
+				modules_call_method( 'display_backoffice_UI', array(
+						'ctrl'   => 'user',
+						'action' => $action,
+						'tab'    => $user_tab,
+					) );
 				break;
 		}
 

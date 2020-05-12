@@ -7,7 +7,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}.
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}.
  * Parts of this file are copyright (c)2004-2005 by Daniel HAHLER - {@link http://thequod.de/contact}.
  *
  * @package evocore
@@ -391,7 +391,12 @@ function campaign_results_block( $params = array() )
 		$Results->global_icon( T_('Create new campaign').'...', 'new', $admin_url.'?ctrl=campaigns&amp;action=new'.( isset( $params['enlt_ID'] ) ? '&amp;enlt_ID='.$params['enlt_ID'] : '' ), T_('Create new campaign').' &raquo;', 3, 4, array( 'class' => 'action_icon btn-primary' ) );
 	}
 
-	$Results->filter_area = array( 'callback' => 'filter_campaign_results_block' );
+	$Results->filter_area = array( 
+			'callback' => 'filter_campaign_results_block' 
+		);
+
+// fp>yb TODO: make All go to correct URL; 
+	$Results->register_filter_preset( 'all', T_('All'), $admin_url.'?ctrl=campaigns' );
 
 	$Results->cols[] = array(
 			'th' => T_('ID'),

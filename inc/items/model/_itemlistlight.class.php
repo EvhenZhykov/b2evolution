@@ -10,7 +10,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}
  *
  * @package evocore
  */
@@ -120,6 +120,7 @@ class ItemListLight extends DataObjectList2
 		$this->set_default_filters( array(
 				'filter_preset' => NULL,
 				'flagged' => false,
+				'mustread' => false, // true/1/'all' - All(Read and Unread) items with "must read" flag, 'unread' - Items which are not read by current User yet, 'read' - Items which are already read by current User, false - Don't match items with "must read" flag
 				'ts_min' => $timestamp_min,
 				'ts_max' => $timestamp_max,
 				'ts_created_max' => NULL,
@@ -300,6 +301,11 @@ class ItemListLight extends DataObjectList2
 			 * Restrict by flagged items:
 			 */
 			memorize_param( $this->param_prefix.'flagged', 'integer', $this->default_filters['flagged'], $this->filters['flagged'] );
+
+			/*
+			 * Restrict by "must read" items:
+			 */
+			memorize_param( $this->param_prefix.'mustread', 'string', $this->default_filters['mustread'], $this->filters['mustread'] );
 
 			// TODO: show_past/future should probably be wired on dstart/dstop instead on timestamps -> get timestamps out of filter perimeter
 			if( is_null($this->default_filters['ts_min'])
@@ -501,6 +507,12 @@ class ItemListLight extends DataObjectList2
 		$this->filters['flagged'] = param( $this->param_prefix.'flagged', 'integer', $this->default_filters['flagged'], true );
 
 
+		/*
+		 * Restrict by "must read" items:
+		 */
+		$this->filters['mustread'] = param( $this->param_prefix.'mustread', 'string', $this->default_filters['mustread'], true );
+
+
 		// TODO: show_past/future should probably be wired on dstart/dstop instead on timestamps -> get timestamps out of filter perimeter
 		// So far, these act as SILENT filters. They will not advertise their filtering in titles etc.
 		$this->filters['ts_min'] = $this->default_filters['ts_min'];
@@ -629,6 +641,11 @@ class ItemListLight extends DataObjectList2
 		$this->ItemQuery->where_visibility( $this->filters['visibility_array'], $this->filters['coll_IDs'] );
 		$this->ItemQuery->where_featured( $this->filters['featured'] );
 		$this->ItemQuery->where_flagged( $this->filters['flagged'] );
+		if( ! $this->single_post )
+		{	// Restrict with locale visibility by current navigation locale ONLY for not single page:
+			$this->ItemQuery->where_locale_visibility();
+		}
+		$this->ItemQuery->where_mustread( $this->filters['mustread'] );
 
 
 		/*
@@ -883,6 +900,7 @@ class ItemListLight extends DataObjectList2
 		                                   $this->filters['ymdhms_min'], $this->filters['ymdhms_max'],
 		                                   $this->filters['ts_min'], $this->filters['ts_max'] );
 		$lastpost_ItemQuery->where_visibility( $this->filters['visibility_array'] );
+		$lastpost_ItemQuery->where_locale_visibility();
 
 		/*
 		 * order by stuff:
@@ -958,6 +976,10 @@ class ItemListLight extends DataObjectList2
 				'status_text'         => T_('Status').': ',
 				'statuses_text'       => T_('Statuses').': ',
 
+				'display_itemtype'    => true,
+				'type_text'           => T_('Item Type').': ',
+				'types_text'          => T_('Item Types').': ',
+
 				'display_archive'     => true,
 				'archives_text'       => T_('Archives for').': ',
 
@@ -968,6 +990,7 @@ class ItemListLight extends DataObjectList2
 				'display_time'        => true,
 				'display_limit'       => true,
 				'display_flagged'     => true,
+				'display_mustread'    => true,
 
 				'group_mask'          => '$group_title$$filter_items$', // $group_title$, $filter_items$
 				'filter_mask'         => '"$filter_name$"', // $group_title$, $filter_name$, $clear_icon$
@@ -1042,7 +1065,7 @@ class ItemListLight extends DataObjectList2
 					if( ( $tmp_Chapter = & $ChapterCache->get_by_ID( $cat_ID, false ) ) !== false )
 					{ // It is almost never meaningful to die over an invalid cat when generating title
 						$cat_clear_url = regenerate_url( ( empty( $catsel_param ) ? 'cat=' : 'catsel=' ).$cat_ID );
-						if( $disp_detail == 'posts-topcat' || $disp_detail == 'posts-subcat' || $disp_detail == 'posts-cat' )
+						if( in_array( $disp_detail, array( 'posts-cat', 'posts-topcat-intro', 'posts-topcat-nointro', 'posts-subcat-intro', 'posts-subcat-nointro' ) ) )
 						{ // Remove category url from $ReqPath when we use the cat url instead of cat ID
 							$cat_clear_url = str_replace( '/'.$tmp_Chapter->get_url_path(), '', $cat_clear_url );
 						}
@@ -1374,6 +1397,46 @@ class ItemListLight extends DataObjectList2
 			}
 		}
 
+		// ITEM TYPE:
+		if( $params['display_itemtype'] )
+		{
+			$item_type_IDs = $this->filters['types'];
+
+			if( !empty( $item_type_IDs ) && !in_array( 'itemtype', $ignore ) )
+			{	// We want to show some Item Type names:
+				$filter_class_i = ( $filter_class_i > count( $filter_classes ) - 1 ) ? 0 : $filter_class_i;
+				$type_names = array();
+				$ItemTypeCache = & get_ItemTypeCache();
+				$invert = false;
+				if( substr( $item_type_IDs, 0, 1) == '-' )
+				{
+					$invert = true;
+					$item_type_IDs = substr( $item_type_IDs, 1 );
+				}
+				$item_type_IDs = explode(',', $this->filters['types']);
+				$ItemTypeCache->load_list( $item_type_IDs, $invert );
+				$item_type_IDs = $ItemTypeCache->get_ID_array();
+				foreach( $item_type_IDs as $item_type_ID )
+				{
+					if( ( $tmp_ItemType = & $ItemTypeCache->get_by_ID( $item_type_ID, false, false ) ) !== false )
+					{
+						$type_clear_url = regenerate_url( $this->param_prefix.'types='.$item_type_ID );
+						$type_clear_icon = $clear_icon ? action_icon( T_('Remove this filter'), 'remove', $type_clear_url ) : '';
+						$type_names[] = str_replace( array( '$group_title$', '$filter_name$', '$clear_icon$', '$filter_class$' ),
+							array( $params['type_text'], $tmp_ItemType->name, $type_clear_icon, $filter_classes[ $filter_class_i ] ),
+							$params['filter_mask'] );
+					}
+				}
+				$filter_class_i++;
+				$type_name_string = implode( $params['separator_and'], $type_names );
+				$title_array[] = str_replace( array( '$group_title$', '$filter_items$' ),
+					( count( $type_names ) > 1 ?
+						array( $params['types_text'], $params['before_items'].$type_name_string.$params['after_items'] ) :
+						array( $params['type_text'], $type_name_string ) ),
+					$params['group_mask'] );
+			}
+		}
+
 
 		if( $params['display_time'] )
 		{
@@ -1502,6 +1565,21 @@ class ItemListLight extends DataObjectList2
 				$unit_clear_icon = $clear_icon ? action_icon( T_('Remove this filter'), 'remove', regenerate_url( $this->param_prefix.'flagged' ) ) : '';
 				$title_array['flagged'] = str_replace( array( '$filter_name$', '$clear_icon$', '$filter_class$' ),
 					array( T_('Flagged'), $unit_clear_icon, $filter_classes[ $filter_class_i ] ),
+					$params['filter_mask_nogroup'] );
+				$filter_class_i++;
+			}
+		}
+
+
+		// MUST READ:
+		if( $params['display_mustread'] )
+		{
+			if( ! empty( $this->filters['mustread'] ) )
+			{	// Display when only "must read" items:
+				$filter_class_i = ( $filter_class_i > count( $filter_classes ) - 1 ) ? 0 : $filter_class_i;
+				$unit_clear_icon = $clear_icon ? action_icon( T_('Remove this filter'), 'remove', regenerate_url( $this->param_prefix.'mustread' ) ) : '';
+				$title_array['mustread'] = str_replace( array( '$filter_name$', '$clear_icon$', '$filter_class$' ),
+					array( T_('Must read'), $unit_clear_icon, $filter_classes[ $filter_class_i ] ),
 					$params['filter_mask_nogroup'] );
 				$filter_class_i++;
 			}

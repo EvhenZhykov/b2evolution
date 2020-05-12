@@ -4,7 +4,7 @@
  *
  * b2evolution - {@link http://b2evolution.net/}
  * Released under GNU GPL License - {@link http://b2evolution.net/about/gnu-gpl-license}
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}
  *
  * @todo dh> AFAICS there are three params used for "item ID": "p", "post_ID"
  *       and "item_ID". This should get cleaned up.
@@ -77,6 +77,7 @@ switch( $action )
 	case 'edit':
 	case 'propose':
 	case 'history':
+	case 'history_lastseen':
 	case 'history_details':
 	case 'history_compare':
 	case 'history_restore':
@@ -141,6 +142,8 @@ switch( $action )
 	case 'save_propose':
 	case 'accept_propose':
 	case 'reject_propose':
+	case 'link_version':
+	case 'unlink_version':
 		if( $action != 'edit_switchtab' && $action != 'edit_type' )
 		{ // Stop a request from the blocked IP addresses or Domains
 			antispam_block_request();
@@ -196,6 +199,7 @@ switch( $action )
 	case 'new_mass':
 	case 'new_type':
 	case 'copy':
+	case 'new_version':
 	case 'create_edit':
 	case 'create_link':
 	case 'create':
@@ -569,9 +573,20 @@ switch( $action )
 
 		$selected_items = param( 'selected_items', 'array:integer' );
 		$page = param( 'page', 'integer', 1 );
+		$tab = param( 'tab', 'string', 'type' );
+		$tab_type = param( 'tab_type', 'string', '' );
 
 		// Set an URL to redirect to items list after this action:
-		$redirect_to = $admin_url.'?ctrl=items&blog='.$blog.( $page > 1 ? '&items_full_paged='.$page : '' );
+		$redirect_to = param( 'redirect_to', 'url', NULL );
+
+		if( empty( $redirect_to ) )
+		{
+			$redirect_to = $admin_url.'?ctrl=items&blog='.$blog.'&tab='.$tab.( $page > 1 ? '&items_'.$tab.'_paged='.$page : '' );
+		}
+		if( $tab == 'type' && ! empty( $tab_type ) )
+		{
+			$redirect_to .= '&tab_type='.$tab_type;
+		}
 
 		if( empty( $selected_items ) )
 		{	// If no items selected:
@@ -626,6 +641,69 @@ switch( $action )
 		if( $items_failed )
 		{	// Inform about failed updates:
 			$Messages->add( sprintf( T_('Visibility of %d items could not be updated to %s.'), $items_failed, $item_status_title ), 'error' );
+		}
+
+		// REDIRECT / EXIT:
+		header_redirect( $redirect_to );
+		break;
+
+	case 'mass_delete':
+		// Delete selected items:
+
+		// Check that this action request is not a CSRF hacked request:
+		$Session->assert_received_crumb( 'items' );
+
+		$selected_items = param( 'selected_items', 'array:integer' );
+		$page = param( 'page', 'integer', 1 );
+		$tab = param( 'tab', 'string', 'type' );
+		$tab_type = param( 'tab_type', 'string', '' );
+		$confirm = param( 'confirm', 'integer', 0 );
+
+		// Set an URL to redirect to items list after this action:
+		$redirect_to = $admin_url.'?ctrl=items&blog='.$blog.'&tab='.$tab.( $page > 1 ? '&items_'.$tab.'_paged='.$page : '' );
+		if( $tab == 'type' && ! empty( $tab_type ) )
+		{
+			$redirect_to .= '&tab_type='.$tab_type;
+		}
+
+		if( empty( $selected_items ) )
+		{	// If no items selected:
+			$Messages->add( T_('Please select at least one item.'), 'error' );
+			// REDIRECT / EXIT:
+			header_redirect( $redirect_to );
+		}
+
+		if( $confirm )
+		{	// Mass deleting of the selected items after confirmation:
+			$ItemCache = & get_ItemCache();
+			$items_success = 0;
+			$items_restricted = array();
+			$items_failed = 0;
+			foreach( $selected_items as $selected_item_ID )
+			{
+				if( ( $selected_Item = & $ItemCache->get_by_ID( $selected_item_ID, false, false ) ) &&
+				    $current_User->check_perm( 'item_post!CURSTATUS', 'delete', false, $selected_Item ) &&
+				    $selected_Item->dbdelete() )
+				{	// If current User has a permission to delete the selected Item:
+					$items_success++;
+				}
+				else
+				{	// Wrong item or current User has no perm to delete the selected item:
+					$items_failed++;
+				}
+			}
+			if( $items_success )
+			{	// Inform about success deletes:
+				$Messages->add( sprintf( T_('%d items have been deleted.'), $items_success ), 'success' );
+			}
+			if( $items_failed )
+			{	// Inform about failed updates:
+				$Messages->add( sprintf( T_('%d items could not be deleted.'), $items_failed ), 'error' );
+			}
+		}
+		else
+		{	// Redirect to page for confirmation of mass deleting items:
+			$redirect_to .= '&confirm_action=mass_delete&selected_items='.implode( ',', $selected_items );
 		}
 
 		// REDIRECT / EXIT:
@@ -797,11 +875,266 @@ switch( $action )
 		header_redirect( $redirect_to );
 		break;
 
+	case 'mass_change_cat':
+		// Mass change main category or add extra categories of selected items:
+
+		// Check that this action request is not a CSRF hacked request:
+		$Session->assert_received_crumb( 'items' );
+
+		$selected_items = param( 'selected_items', 'array:integer' );
+		$cat_type = param( 'cat_type', 'string' );
+
+		// Set an URL to redirect to items list after this action:
+		$redirect_to = param( 'redirect_to', 'url', NULL );
+
+		if( empty( $selected_items ) )
+		{	// If no items selected:
+			$Messages->add( T_('Please select at least one item.'), 'error' );
+			// REDIRECT / EXIT:
+			header_redirect( $redirect_to );
+		}
+
+		$ChapterCache = & get_ChapterCache();
+		if( $cat_type == 'main' )
+		{	// Get a selected main category:
+			$main_cat_ID = param( 'post_category', 'integer', true );
+			$main_Chapter = & $ChapterCache->get_by_ID( $main_cat_ID );
+		}
+		else
+		{	// Get the selected extra categories:
+			$extra_categories = param( 'post_extracats', 'array:integer' );
+		}
+
+		if( empty( $main_cat_ID ) && empty( $extra_categories ) )
+		{	// If no categories selected:
+			$Messages->add( T_('Please select a category.'), 'error' );
+			// REDIRECT / EXIT:
+			header_redirect( $redirect_to );
+		}
+
+		$ItemCache = & get_ItemCache();
+		$items_success = 0;
+		$items_failed = 0;
+		foreach( $selected_items as $selected_item_ID )
+		{
+			if( ( $selected_Item = & $ItemCache->get_by_ID( $selected_item_ID, false, false ) ) &&
+			    $current_User->check_perm( 'item_post!CURSTATUS', 'edit', false, $selected_Item ) )
+			{	// If current User has a permission to edit the selected Item:
+				$current_extra_categories = postcats_get_byID( $selected_Item->ID );
+				if( $cat_type == 'main' )
+				{	// Change main category:
+					$selected_Item->set( 'main_cat_ID', $main_cat_ID );
+					// Don't lose current extra categories:
+					$selected_Item->set( 'extra_cat_IDs', $current_extra_categories );
+				}
+				elseif( $cat_type == 'extra' )
+				{	// Add extra categories to previous linked categories:
+					$selected_Item->set( 'extra_cat_IDs', array_unique( array_merge( $current_extra_categories, $extra_categories ) ) );
+				}
+				elseif( $cat_type == 'remove_extra' )
+				{	// Remove extra categories from previous linked categories except if an extra category is also the primary category:
+					$main_cat_ID = $selected_Item->get( 'main_cat_ID' );
+					$remove_extra_categories = $extra_categories;
+					if( ( $key = array_search( $main_cat_ID, $remove_extra_categories ) ) !== false )
+					{
+						unset( $remove_extra_categories[$key] );
+					}
+					
+					if( empty( $remove_extra_categories ) )
+					{	// Nothing to remove, skip to next Item:
+						continue;
+					}
+
+					$selected_Item->set( 'extra_cat_IDs', array_diff( $current_extra_categories, $remove_extra_categories ) );
+				}
+				if( $selected_Item->dbupdate() )
+				{	// If the item has been updated to the requested categories:
+					$items_success++;
+					continue;
+				}
+			}
+			// Wrong item or current User has no perm to edit the selected item:
+			$items_failed++;
+		}
+
+		if( $cat_type == 'main' )
+		{	// Report about changed main category:
+			if( $items_success )
+			{	// Inform about success updates:
+				$Messages->add( sprintf( T_('Main category of %d items have been changed to %s.'), $items_success, '"'.$main_Chapter->get( 'name' ).'"' ), 'success' );
+			}
+			if( $items_failed )
+			{	// Inform about failed updates:
+				$Messages->add( sprintf( T_('Main category of %d items could not be changed to %s.'), $items_failed, '"'.$main_Chapter->get( 'name' ).'"' ), 'error' );
+			}
+		}
+		elseif( $cat_type == 'extra' )
+		{	// Report about added extra categories:
+			$extra_cats_names = array();
+			foreach( $extra_categories as $extra_cat_ID )
+			{
+				if( $extra_Chapter = & $ChapterCache->get_by_ID( $extra_cat_ID, false, false ) )
+				{
+					$extra_cats_names[] = '"'.$extra_Chapter->get( 'name' ).'"';
+				}
+			}
+			if( $items_success )
+			{	// Inform about success updates:
+				$Messages->add( sprintf( T_('Extra categories %s of %d items have been added.'), implode( ', ', $extra_cats_names ), $items_success ), 'success' );
+			}
+			if( $items_failed )
+			{	// Inform about failed updates:
+				$Messages->add( sprintf( T_('Extra categories %s of %d items could not be added.'), implode( ', ', $extra_cats_names ), $items_failed ), 'error' );
+			}
+		}
+		elseif( $cat_type == 'remove_extra' )
+		{	// Report about removed extra categories:
+			$extra_cats_names = array();
+			foreach( $extra_categories as $extra_cat_ID )
+			{
+				if( $extra_Chapter = & $ChapterCache->get_by_ID( $extra_cat_ID, false, false ) )
+				{
+					$extra_cats_names[] = '"'.$extra_Chapter->get( 'name' ).'"';
+				}
+			}
+			if( $items_success )
+			{	// Inform about success updates:
+				$Messages->add( sprintf( T_('Extra categories %s of %d items have been removed.'), implode( ', ', $extra_cats_names ), $items_success ), 'success' );
+			}
+			if( $items_failed )
+			{	// Inform about failed updates:
+				$Messages->add( sprintf( T_('Extra categories %s of %d items could not be removed.'), implode( ', ', $extra_cats_names ), $items_failed ), 'error' );
+			}
+		}
+
+		// REDIRECT / EXIT:
+		header_redirect( $redirect_to );
+		break;
+
+	case 'mass_change_renderer':
+		// Mass change renderers of selected items:
+
+		// Check that this action request is not a CSRF hacked request:
+		$Session->assert_received_crumb( 'items' );
+
+		$selected_items = param( 'selected_items', 'array:integer' );
+		$renderer_change_type = param( 'renderer_change_type', 'string' );
+
+		// Set an URL to redirect to items list after this action:
+		$redirect_to = param( 'redirect_to', 'url', NULL );
+
+		if( empty( $selected_items ) )
+		{	// If no items selected:
+			$Messages->add( T_('Please select at least one item.'), 'error' );
+			// REDIRECT / EXIT:
+			header_redirect( $redirect_to );
+		}
+
+		// Get the selected renderers:
+		$renderers = param( 'renderers', 'array:string' );
+
+		if( empty( $renderers ) )
+		{	// If no categories selected:
+			$Messages->add( T_('Please select a renderer.'), 'error' );
+			// REDIRECT / EXIT:
+			header_redirect( $redirect_to );
+		}
+
+		$ItemCache = & get_ItemCache();
+		$items_success = 0;
+		$items_failed = 0;
+		foreach( $selected_items as $selected_item_ID )
+		{
+			if( ( $selected_Item = & $ItemCache->get_by_ID( $selected_item_ID, false, false ) ) &&
+			    $current_User->check_perm( 'item_post!CURSTATUS', 'edit', false, $selected_Item ) )
+			{	// If current User has a permission to edit the selected Item:
+				if( $renderer_change_type == 'add_renderer' )
+				{
+					foreach( $renderers as $renderer )
+					{
+						$selected_Item->add_renderer( $renderer );
+					}
+				}
+				elseif( $renderer_change_type == 'remove_renderer' )
+				{
+					foreach( $renderers as $renderer )
+					{
+						$selected_Item->remove_renderer( $renderer );
+					}
+				}
+
+				// In any case, remove 'default' renderer:
+				$selected_Item->remove_renderer( 'default' );
+				
+				if( $selected_Item->dbupdate() )
+				{	// If the item has been updated with the requested renderers:
+					$items_success++;
+					continue;
+				}
+			}
+			// Wrong item or current User has no perm to edit the selected item:
+			$items_failed++;
+		}
+
+		global $Plugins;
+
+		if( $renderer_change_type == 'add_renderer' )
+		{	// Report about added renderers:
+			$renderer_names = array();
+			foreach( $renderers as $code )
+			{
+				if( $renderer_Plugin = & $Plugins->get_by_code( $code	) )
+				{
+					$renderer_names[] = '"'.$renderer_Plugin->name.'"';
+				}
+			}
+			if( $items_success )
+			{	// Inform about success updates:
+				$Messages->add( sprintf( T_('Renderers %s of %d items have been added.'), implode( ', ', $renderer_names ), $items_success ), 'success' );
+			}
+			if( $items_failed )
+			{	// Inform about failed updates:
+				$Messages->add( sprintf( T_('Renderers %s of %d items could not be added.'), implode( ', ', $renderer_names ), $items_failed ), 'error' );
+			}
+		}
+		elseif( $renderer_change_type == 'remove_renderer' )
+		{	// Report about removed extra categories:
+			$renderer_names = array();
+			foreach( $renderers as $code )
+			{
+				if( $renderer_Plugin = & $Plugins->get_by_code( $code ) )
+				{
+					$renderer_names[] = '"'.$renderer_Plugin->name.'"';
+				}
+			}
+			if( $items_success )
+			{	// Inform about success updates:
+				$Messages->add( sprintf( T_('Renderers %s of %d items have been removed.'), implode( ', ', $renderer_names ), $items_success ), 'success' );
+			}
+			if( $items_failed )
+			{	// Inform about failed updates:
+				$Messages->add( sprintf( T_('Renderers %s of %d items could not be removed.'), implode( ', ', $renderer_names ), $items_failed ), 'error' );
+			}
+		}
+
+		// REDIRECT / EXIT:
+		header_redirect( $redirect_to );
+		break;
+
 	default:
-		debug_die( 'unhandled action 1:'.htmlspecialchars($action) );
+		// Try to handle action by modules:
+		$module_result = modules_call_method( 'handle_backoffice_action', array(
+				'ctrl'        => 'items',
+				'action'      => $action,
+				'action_type' => 'action1',
+			) );
+		if( $module_result === NULL )
+		{	// Deny wrong action if it is not handled by any module:
+			debug_die( 'unhandled action 1:'.htmlspecialchars($action) );
+		}
 }
 
-$AdminUI->breadcrumbpath_init( true, array( 'text' => T_('Collections'), 'url' => $admin_url.'?ctrl=coll_settings&amp;tab=dashboard&amp;blog=$blog$' ) );
+$AdminUI->breadcrumbpath_init( true, array( 'text' => T_('Collections'), 'url' => $admin_url.'?ctrl=collections' ) );
 $AdminUI->breadcrumbpath_add( T_('Posts'), $admin_url.'?ctrl=items&amp;blog=$blog$&amp;tab=full&amp;filter=restore' );
 
 /**
@@ -880,6 +1213,7 @@ switch( $action )
 			$edited_Item->set('main_cat_ID', $Blog->get_default_cat_ID());
 		}
 		$post_extracats = param( 'post_extracats', 'array:integer', $post_extracats );
+		$edited_Item->set( 'extra_cat_IDs', $post_extracats );
 
 		param( 'item_tags', 'string', '' );
 
@@ -918,6 +1252,7 @@ switch( $action )
 
 
 	case 'copy': // Duplicate post
+	case 'new_version': // Add version
 		$item_ID = param( 'p', 'integer', true );
 		$ItemCache = &get_ItemCache();
 		$edited_Item = & $ItemCache->get_by_ID( $item_ID );
@@ -929,6 +1264,9 @@ switch( $action )
 		$edited_Item->load_ItemSettings();
 		$edited_Item->ItemSettings->_load( $edited_Item->ID, NULL );
 		$edited_Item->ItemSettings->cache[0] = $edited_Item->ItemSettings->cache[ $edited_Item->ID ];
+
+		// Load all custom fields:
+		$edited_Item->get_custom_fields_defs();
 
 		// Set ID of copied post to 0, because some functions can update current post, e.g. $edited_Item->get( 'excerpt' )
 		$edited_Item->ID = 0;
@@ -943,15 +1281,70 @@ switch( $action )
 		$edited_Item->set( 'dateset', 0 );	// Date not explicitly set yet
 		$edited_Item->set( 'issue_date', date( 'Y-m-d H:i:s', $localtimenow ) );
 
+		if( $action == 'new_version' )
+		{	// Creating new version
+			if( param( 'post_locale', 'string', NULL ) !== NULL )
+			{	// Set locale:
+				$edited_Item->set_from_Request( 'locale' );
+			}
+
+			if( param( 'post_create_child', 'integer', NULL ) === 1 )
+			{	// Set parent Item:
+				$edited_Item->set( 'parent_ID', $item_ID );
+			}
+
+			// Duplicate same images depending on setting from modal window:
+			$duplicate_same_images = param( 'post_same_images', 'integer', NULL );
+
+			if( param( 'post_coll_ID', 'integer', NULL ) !== NULL &&
+			    $post_coll_ID != $edited_Item->get_blog_ID() )
+			{	// Create Item in different collection:
+				$BlogCache = & get_BlogCache();
+				$linked_Blog = $BlogCache->get_by_ID( $post_coll_ID, false, false );
+				if( ! $current_User->check_perm( 'blog_post_statuses', 'edit', false, $post_coll_ID ) )
+				{	// If current User cannot create an Item in the selected locale collection,
+					// Redirect back to edit Item form:
+					$Messages->add( sprintf( T_('You don\'t have a permission to create new Item in the collection "%s"!'), $linked_Blog ? $linked_Blog->get( 'name' ) : '#'.$post_coll_ID ) );
+					header_redirect( $admin_url.'?ctrl=items&blog='.$edited_Item->get_blog_ID().'&action=edit&p='.$p );
+					// Exit here.
+				}
+				// Reset Item collection to new selected:
+				set_working_blog( $post_coll_ID );
+				unset( $edited_Item->Blog );
+				// Set default category in different selected collection:
+				$edited_Item->set( 'main_cat_ID', $linked_Blog->get_default_cat_ID() );
+				$post_extracats = array( $edited_Item->get( 'main_cat_ID' ) );
+			}
+
+			if( param( 'item_typ_ID', 'integer', NULL ) !== NULL )
+			{	// Set Item Type:
+				if( ! $edited_Item->get_Blog()->is_item_type_enabled( $item_typ_ID ) )
+				{	// Use default Item Type if it is NOT enabled for the selected collection:
+					$default_ItemType = & $edited_Item->get_Blog()->get_default_new_ItemType();
+					$item_typ_ID = $default_ItemType->ID;
+				}
+				$edited_Item->set( 'ityp_ID', $item_typ_ID );
+			}
+		}
+		else
+		{	// Always duplicate images on action=copy:
+			$duplicate_same_images = true;
+		}
+
 		// Set post comment status and extracats
 		$post_comment_status = $edited_Item->get( 'comment_status' );
-		$post_extracats = postcats_get_byID( $p );
+		if( ! isset( $post_extracats ) )
+		{
+			$post_extracats = postcats_get_byID( $p );
+		}
 
 		// Check if new category was started to create. If yes then set up parameters for next page:
 		check_categories_nosave( $post_category, $post_extracats, $edited_Item );
 
-		// Duplicate attachments from source Item:
-		$edited_Item->duplicate_attachments( $item_ID );
+		if( $duplicate_same_images )
+		{	// Duplicate attachments from source Item:
+			$edited_Item->duplicate_attachments( $item_ID );
+		}
 
 		// Initialize a page title depending on item type:
 		$ItemTypeCache = & get_ItemTypeCache();
@@ -998,6 +1391,7 @@ switch( $action )
 			$edited_Item->set('main_cat_ID', $Blog->get_default_cat_ID());
 		}
 		$post_extracats = param( 'post_extracats', 'array:integer', $post_extracats );
+		$edited_Item->set( 'extra_cat_IDs', $post_extracats );
 
 		param( 'item_tags', 'string', '' );
 
@@ -1022,6 +1416,31 @@ switch( $action )
 	case 'history':
 		// Check permission:
 		$current_User->check_perm( 'item_post!CURSTATUS', 'edit', true, $edited_Item );
+		break;
+
+	case 'history_lastseen':
+		// Check permission:
+		$current_User->check_perm( 'item_post!CURSTATUS', 'edit', true, $edited_Item );
+
+		$SQL = new SQL( 'Find last not seen revision of the Item #'.$edited_Item->ID.' by current User' );
+		$SQL->SELECT( 'iver_ID' );
+		$SQL->FROM( 'T_items__version' );
+		$SQL->WHERE( 'iver_itm_ID = '.$DB->quote( $edited_Item->ID ) );
+		$SQL->WHERE_and( 'iver_type = "archived"' );
+		$SQL->WHERE_and( 'iver_edit_last_touched_ts <= '.$DB->quote( $edited_Item->get_user_data( 'item_date' ) ) );
+		$SQL->ORDER_BY( 'iver_edit_last_touched_ts DESC' );
+		$SQL->LIMIT( '1' );
+		$lastnotseen_revision_ID = $DB->get_var( $SQL );
+
+		if( $lastnotseen_revision_ID > 0 && $edited_Item->get_user_data( 'item_date' ) < $edited_Item->get( 'last_touched_ts' ) )
+		{	// Redirect to compare last not seen revision with current version:
+			header_redirect( $admin_url.'?ctrl=items&action=history_compare&p='.$edited_Item->ID.'&r1=a'.$lastnotseen_revision_ID.'&r2=c' );
+		}
+		else
+		{	// Redirect to view current version because User have already seen all changes before:
+			$Messages->add( T_('You have already seen all changes of this Item.'), 'note' );
+			header_redirect( $admin_url.'?ctrl=items&action=history_details&p='.$edited_Item->ID.'&r=c' );
+		}
 		break;
 
 	case 'history_details':
@@ -1085,7 +1504,6 @@ switch( $action )
 		// Compare the custom fields of two revisions:
 		$oneline_TableDiffFormatter = new TableDiffFormatter();
 		$oneline_TableDiffFormatter->block_header = '';
-		$revisions_difference_custom_fields = array();
 		// Switch to 1st revision:
 		$edited_Item->set( 'revision', get_param( 'r1' ) );
 		$custom_fields = $edited_Item->get_type_custom_fields();
@@ -1104,6 +1522,7 @@ switch( $action )
 				$custom_fields[ $r2_custom_field['name'] ] = $r2_custom_field;
 			}
 		}
+		$revisions_difference_custom_fields = empty( $custom_fields ) ? false : array(); // FALSE means Item has no custom fields
 		foreach( $custom_fields as $custom_field )
 		{
 			// Get custom field values of both revisions:
@@ -1174,9 +1593,10 @@ switch( $action )
 		$LinkOwner = new LinkItem( $edited_Item );
 		// Switch to 1st revision:
 		$edited_Item->set( 'revision', get_param( 'r1' ) );
-		$revisions_difference_links = array();
+		$revisions_difference_links = false; // FALSE means Item has no attached files
 		if( $r1_LinkList = $LinkOwner->get_attachment_LinkList() )
 		{
+			$revisions_difference_links = array();
 			while( $r1_Link = & $r1_LinkList->get_next() )
 			{
 				$revisions_difference_links[ $r1_Link->ID ]['r1'] = array(
@@ -1192,6 +1612,10 @@ switch( $action )
 		$edited_Item->set( 'revision', get_param( 'r2' ) );
 		if( $r2_LinkList = $LinkOwner->get_attachment_LinkList() )
 		{
+			if( ! is_array( $revisions_difference_links ) )
+			{
+				$revisions_difference_links = array();
+			}
 			while( $r2_Link = & $r2_LinkList->get_next() )
 			{
 				$r_link_data = array(
@@ -1273,9 +1697,18 @@ switch( $action )
 		$Session->assert_received_crumb( 'item' );
 
 		// Get params to skip/force/mark notifications and pings:
-		param( 'item_members_notified', 'string', NULL );
-		param( 'item_community_notified', 'string', NULL );
-		param( 'item_pings_sent', 'string', NULL );
+		if( $current_User->check_perm( 'blog_edit_ts', 'edit', false, $Blog->ID ) )
+		{	// If user has a permission to edit advanced properties of items:
+			param( 'item_members_notified', 'string', NULL );
+			param( 'item_community_notified', 'string', NULL );
+			param( 'item_pings_sent', 'string', NULL );
+		}
+		else
+		{	// Use auto mode for notifications depending on the edited Item status:
+			$item_members_notified = false;
+			$item_community_notified = false;
+			$item_pings_sent = false;
+		}
 
 		// We need early decoding of these in order to check permissions:
 		param( 'post_status', 'string', 'published' );
@@ -1467,6 +1900,73 @@ switch( $action )
 		/* EXITED */
 		break;
 
+	case 'link_version':
+		// Link the edited Post with the selected Post:
+
+		// Check that this action request is not a CSRF hacked request:
+		$Session->assert_received_crumb( 'item' );
+
+		// Check edit permission:
+		$current_User->check_perm( 'item_post!CURSTATUS', 'edit', true, $edited_Item );
+
+		param( 'dest_post_ID', 'integer', true );
+
+		$ItemCache = & get_ItemCache();
+		if( $dest_Item = & $ItemCache->get_by_ID( $dest_post_ID, false, false ) )
+		{	// Do the linking:
+			$dest_Item->set_group_ID( $edited_Item->ID );
+			$dest_Item->dbupdate();
+
+			// Remember what last collection was used for linking in order to display it by default on next linking:
+			$UserSettings->set( 'last_linked_coll_ID', $dest_Item->get_blog_ID() );
+			$UserSettings->dbupdate();
+
+			// Inform user about duplicated locale in the same group:
+			$other_version_items = $dest_Item->get_other_version_items();
+			foreach( $other_version_items as $other_version_Item )
+			{
+				if( $dest_Item->get( 'locale' ) == $other_version_Item->get( 'locale' ) )
+				{	// This is a duplicate locale
+					$Messages->add( sprintf( T_('WARNING: several versions of this Item use the same locale %s.'), '<code>'.$dest_Item->get( 'locale' ).'</code>' ), 'warning' );
+					break;
+				}
+			}
+
+			// Display result message after redirect:
+			$Messages->add( sprintf( T_('The Item "%s" (%s) has been linked to the current Item.'), $dest_Item->get( 'title' ), $dest_Item->get( 'locale' ) ), 'success' );
+		}
+
+		// REDIRECT / EXIT:
+		header_redirect( $edited_Item->get_edit_url( array( 'glue' => '&' ) ) );
+		/* EXITED */
+		break;
+
+	case 'unlink_version':
+		// Unlink the selected Post from the edited Post:
+
+		// Check that this action request is not a CSRF hacked request:
+		$Session->assert_received_crumb( 'item' );
+
+		// Check edit permission:
+		$current_User->check_perm( 'item_post!CURSTATUS', 'edit', true, $edited_Item );
+
+		param( 'unlink_item_ID', 'integer', true );
+
+		$ItemCache = & get_ItemCache();
+		if( $unlink_Item = & $ItemCache->get_by_ID( $unlink_item_ID, false, false ) )
+		{	// Do the unlinking:
+			$unlink_Item->set( 'igrp_ID', NULL, true );
+			$unlink_Item->dbupdate();
+
+			// Display result message after redirect:
+			$Messages->add( sprintf( T_('The Item %s (%s) has been unlinked from the current Item.'), $unlink_Item->get( 'title' ), $unlink_Item->get( 'locale' ) ), 'success' );
+		}
+
+		// REDIRECT / EXIT:
+		header_redirect( $edited_Item->get_edit_url( array( 'glue' => '&' ) ) );
+		/* EXITED */
+		break;
+
 	case 'update_edit':
 	case 'update':
 	case 'update_publish':
@@ -1481,9 +1981,18 @@ switch( $action )
 		save_fieldset_folding_values( $Blog->ID );
 
 		// Get params to skip/force/mark notifications and pings:
-		param( 'item_members_notified', 'string', NULL );
-		param( 'item_community_notified', 'string', NULL );
-		param( 'item_pings_sent', 'string', NULL );
+		if( $current_User->check_perm( 'blog_edit_ts', 'edit', false, $Blog->ID ) )
+		{	// If user has a permission to edit advanced properties of items:
+			param( 'item_members_notified', 'string', NULL );
+			param( 'item_community_notified', 'string', NULL );
+			param( 'item_pings_sent', 'string', NULL );
+		}
+		else
+		{	// Use auto mode for notifications depending on the edited Item status:
+			$item_members_notified = false;
+			$item_community_notified = false;
+			$item_pings_sent = false;
+		}
 
 		// We need early decoding of these in order to check permissions:
 		param( 'post_status', 'string', 'published' );
@@ -1894,9 +2403,18 @@ switch( $action )
 		}
 
 		// Get params to skip/force/mark notifications and pings:
-		param( 'item_members_notified', 'string', NULL );
-		param( 'item_community_notified', 'string', NULL );
-		param( 'item_pings_sent', 'string', NULL );
+		if( $current_User->check_perm( 'blog_edit_ts', 'edit', false, $Blog->ID ) )
+		{	// If user has a permission to edit advanced properties of items:
+			param( 'item_members_notified', 'string', NULL );
+			param( 'item_community_notified', 'string', NULL );
+			param( 'item_pings_sent', 'string', NULL );
+		}
+		else
+		{	// Use auto mode for notifications depending on the edited Item status:
+			$item_members_notified = false;
+			$item_community_notified = false;
+			$item_pings_sent = false;
+		}
 
 		// Execute or schedule notifications & pings:
 		$edited_Item->handle_notifications( NULL, false, $item_members_notified, $item_community_notified, $item_pings_sent );
@@ -2311,6 +2829,9 @@ function init_list_mode()
 			// require colorbox js
 			require_js_helper( 'colorbox' );
 
+			// require clipboardjs
+			require_js( '#clipboardjs#' );
+
 			$AdminUI->breadcrumbpath_add( T_('All'), '?ctrl=items&amp;blog=$blog$&amp;tab=full&amp;filter=restore' );
 			break;
 
@@ -2391,6 +2912,7 @@ switch( $action )
 	case 'new_switchtab': // this gets set as action by JS, when we switch tabs
 	case 'new_type': // this gets set as action by JS, when we switch tabs
 	case 'copy':
+	case 'new_version':
 	case 'create_edit':
 	case 'create_link':
 	case 'create':
@@ -2425,7 +2947,6 @@ switch( $action )
 	case 'history_details':
 	case 'history_compare':
 	case 'extract_tags':
-
 		// Generate available blogs list:
 		$AdminUI->set_coll_list_params( 'blog_ismember', 'view', array( 'ctrl' => 'items', 'filter' => 'restore' ) );
 
@@ -2503,8 +3024,8 @@ switch( $action )
 		{
 			if( $edited_Item->ID > 0 )
 			{ // Display a link to history if Item exists in DB
-				$AdminUI->global_icon( T_('History'), '', $edited_Item->get_history_url(),
-					$edited_Item->history_info_icon().' '.T_('History'), 4, 3, array(
+				$AdminUI->global_icon( T_('Changes'), '', $edited_Item->get_history_url(),
+					$edited_Item->history_info_icon().' '.T_('Changes'), 4, 3, array(
 							'style' => 'margin-right: 3ex'
 					) );
 
@@ -2538,13 +3059,15 @@ switch( $action )
 				$AdminUI->global_icon( T_('In-skin editing'), 'edit', $mode_inskin_url,
 						' '.T_('In-skin editing'), 4, 3, array(
 						'style' => 'margin-right: 3ex',
+						'data-shortcut' => 'f2',
 						'onclick' => 'return b2edit_reload( \'#item_checkchanges\', \''.$mode_inskin_action.'\' );'
 				) );
 			}
 
 			$AdminUI->global_icon( T_('Cancel editing').'!', 'close', $redirect_to, T_('Cancel'), 4, 2 );
 
-			init_tokeninput_js();
+			init_tokeninput_js( 'blog' );
+			init_hotkeys_js( 'blog', array( 'f2', 'f9' ) );
 		}
 
 		if( in_array( $action, array( 'history', 'history_details', 'history_compare' ) ) )
@@ -2600,6 +3123,8 @@ switch( $action )
 		{
 			$tab = 'full';
 		}
+
+		init_hotkeys_js( 'blog', array( 'f2', 'ctrl+f2' ) );
 
 		// Generate available blogs list:
 		$AdminUI->set_coll_list_params( 'blog_ismember', 'view', array( 'ctrl' => 'items', 'tab' => $tab, 'filter' => 'restore' ) );
@@ -2687,7 +3212,7 @@ if( $action == 'view' || $action == 'history_compare' || strpos( $action, 'edit'
 	init_fileuploader_js();
 }
 
-if( in_array( $action, array( 'new', 'copy', 'create_edit', 'create_link', 'create', 'create_publish', 'edit', 'update_edit', 'update', 'update_publish', 'extract_tags' ) ) )
+if( in_array( $action, array( 'new', 'new_version', 'copy', 'create_edit', 'create_link', 'create', 'create_publish', 'edit', 'update_edit', 'update', 'update_publish', 'extract_tags' ) ) )
 { // Set manual link for edit expert mode
 	$AdminUI->set_page_manual_link( 'expert-edit-screen' );
 }
@@ -2704,6 +3229,7 @@ switch( $action )
 	case 'edit':
 	case 'edit_switchtab':
 	case 'copy':
+	case 'new_version':
 	case 'create':
 	case 'create_edit':
 	case 'create_link':
@@ -2764,6 +3290,7 @@ switch( $action )
 		$bozo_start_modified = true;	// We want to start with a form being already modified
 	case 'new':
 	case 'copy':
+	case 'new_version':
 	case 'create_edit':
 	case 'create_link':
 	case 'create':
@@ -2780,7 +3307,12 @@ switch( $action )
 		// We never allow HTML in titles, so we always encode and decode special chars.
 		$item_title = htmlspecialchars_decode( $edited_Item->get( 'title' ) );
 
-		$item_content = prepare_item_content( $edited_Item->get( 'content' ) );
+		$item_content = $edited_Item->get( 'content' );
+		if( $item_content === NULL )
+		{	// Use text template for new creating Item:
+			$item_content = $edited_Item->get_type_setting( 'text_template' );
+		}
+		$item_content = prepare_item_content( $item_content );
 
 		if( ! $edited_Item->get_type_setting( 'allow_html' ) )
 		{ // HTML is disallowed for this post, content is encoded in DB and we need to decode it for editing:
@@ -2852,7 +3384,7 @@ switch( $action )
 		// Memorize 'p' in case we reload while changing some display settings
 		memorize_param( 'p', 'integer', NULL );
 
-		// What comments view, 'feedback' - all user comments, 'meta' - meta comments of the admins
+		// What comments view, 'feedback' - all user comments, 'meta' - internal comments of the admins
 		param( 'comment_type', 'string', 'feedback', true );
 
 		// Begin payload block:

@@ -4,7 +4,7 @@
  *
  * b2evolution - {@link http://b2evolution.net/}
  * Released under GNU GPL License - {@link http://b2evolution.net/about/gnu-gpl-license}
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}
  *
  * @package admin
  */
@@ -58,7 +58,7 @@ switch( $action )
 
 		// Some users can delete & change a status of comments in their own posts, set corresponding permlevel
 		if( $edited_Comment->is_meta() )
-		{ // Use special permissions for meta comment
+		{ // Use special permissions for internal comment
 			$check_permname = 'meta_comment';
 			$check_permlevel = $action == 'delete' ? 'delete' : 'edit';
 		}
@@ -137,7 +137,7 @@ switch( $action )
 
 		// Check permission:
 		if( $tab3 == 'meta' )
-		{	// For meta comments:
+		{	// For internal comments:
 			$selected = autoselect_blog( 'meta_comment', 'blog' );
 		}
 		else
@@ -193,7 +193,7 @@ switch( $action )
 		debug_die( 'unhandled action 1' );
 }
 
-$AdminUI->breadcrumbpath_init( true, array( 'text' => T_('Collections'), 'url' => $admin_url.'?ctrl=coll_settings&amp;tab=dashboard&amp;blog=$blog$' ) );
+$AdminUI->breadcrumbpath_init( true, array( 'text' => T_('Collections'), 'url' => $admin_url.'?ctrl=collections' ) );
 $AdminUI->breadcrumbpath_add( T_('Comments'), $admin_url.'?ctrl=comments&amp;blog=$blog$&amp;filter=restore' );
 switch( $tab3 )
 {
@@ -206,10 +206,10 @@ switch( $tab3 )
 		break;
 
 	case 'meta':
-		// Check permission for meta comments:
+		// Check permission for internal comments:
 		$current_User->check_perm( 'meta_comment', 'view', true, $Blog->ID );
 
-		$AdminUI->breadcrumbpath_add( T_('Meta discussion'), $admin_url.'?ctrl=comments&amp;blog=$blog$&amp;tab3='.$tab3.'&amp;filter=restore' );
+		$AdminUI->breadcrumbpath_add( T_('Internal comments'), $admin_url.'?ctrl=comments&amp;blog=$blog$&amp;tab3='.$tab3.'&amp;filter=restore' );
 		break;
 }
 
@@ -424,8 +424,14 @@ switch( $action )
 
 		if( $can_edit_backoffice_settings )
 		{	// It can be updated only from back-office:
-			param( 'comment_nofollow', 'integer', 0 );
-			$edited_Comment->set_from_Request( 'nofollow' );
+			param( 'comment_author_url_nofollow', 'integer', 0 );
+			$edited_Comment->set_from_Request( 'author_url_nofollow' );
+
+			param( 'comment_author_url_ugc', 'integer', 0 );
+			$edited_Comment->set_from_Request( 'author_url_ugc' );
+
+			param( 'comment_author_url_sponsored', 'integer', 0 );
+			$edited_Comment->set_from_Request( 'author_url_sponsored' );
 		}
 
 		if( $Messages->has_errors() )
@@ -723,7 +729,7 @@ switch( $action )
 
 		// Filter list:
 		if( $tab3 == 'meta' )
-		{	// Meta comments:
+		{	// Internal comments:
 			$CommentList->set_default_filters( array(
 					'types' => array( 'meta' ),
 					'order' => 'DESC',

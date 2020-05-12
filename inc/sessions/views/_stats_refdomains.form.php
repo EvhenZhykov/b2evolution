@@ -7,7 +7,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}.
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}.
  * Parts of this file are copyright (c)2005 by Daniel HAHLER - {@link http://thequod.de/contact}.
  *
  * @package admin
@@ -37,6 +37,8 @@ $Form->begin_form( 'fform', $creating ?  T_('New Domain') : T_('Domain') );
 	$Form->text_input( 'dom_name', $edited_Domain->get( 'name' ), 50, T_('Name'), '', array( 'maxlength' => 250, 'required' => true ) );
 
 	$Form->select_input_array( 'dom_type', $edited_Domain->get( 'type' ), stats_dom_type_titles() , T_('Referrer type'), '', array( 'force_keys_as_values' => true, 'required' => true ) );
+
+	$Form->text_input( 'dom_source_tag', $edited_Domain->get( 'source_tag' ), 32, TB_('Source Tag'), '', array( 'maxlength' => 32 ) );
 
 	$Form->select_input_array( 'dom_status', $edited_Domain->get( 'status' ), stats_dom_status_titles() , T_('Spam status'), '', array( 'force_keys_as_values' => true, 'background_color' => stats_dom_status_colors(), 'required' => true ) );
 

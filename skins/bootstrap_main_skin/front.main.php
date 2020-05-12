@@ -216,13 +216,14 @@ if( ! empty( $bg_File ) && $bg_File->exists() )
 
 	<div class="row">
 
-		<div class="col-md-12">
-			<div class="evo_container evo_container__front_page_secondary">
 			<?php
 				// ------------------------- "Front Page Secondary Area" CONTAINER EMBEDDED HERE --------------------------
 				// Display container and contents:
-				skin_container( NT_('Front Page Secondary Area'), array(
+				widget_container( 'front_page_secondary_area', array(
 						// The following params will be used as defaults for widgets included in this container:
+						'container_display_if_empty' => false, // If no widget, don't display container at all
+						'container_start'   => '<div class="col-md-12"><div class="evo_container $wico_class$">',
+						'container_end'     => '</div></div>',
 						'block_start'       => '<div class="evo_widget $wi_class$">',
 						'block_end'         => '</div>',
 						'block_title_start' => '<h2 class="page-header">',
@@ -230,21 +231,22 @@ if( ! empty( $bg_File ) && $bg_File->exists() )
 					) );
 				// ----------------------------- END OF "Front Page Secondary Area" CONTAINER -----------------------------
 			?>
-			</div>
-		</div><!-- .col -->
 
 		<footer class="col-md-12">
 
-			<div class="evo_container evo_container__footer clearfix">
 			<?php
 				// ------------------------- "Footer" CONTAINER EMBEDDED HERE --------------------------
 				// Display container and contents:
-				skin_container( NT_('Footer'), array(
+				widget_container( 'footer', array(
 						// The following params will be used as defaults for widgets included in this container:
+						'container_display_if_empty' => false, // If no widget, don't display container at all
+						'container_start' => '<div class="evo_container $wico_class$ clearfix">', // Note: clearfix is because of Bootstraps' .cols
+						'container_end'   => '</div>',
+						'block_start'     => '<div class="evo_widget $wi_class$">',
+						'block_end'       => '</div>',
 					) );
 				// ----------------------------- END OF "Footer" CONTAINER -----------------------------
 			?>
-			</div>
 
 			<p class="center">
 			<?php
@@ -318,6 +320,28 @@ $slide_down.on( "click", function(event) {
 		scrollTop: $("#slide_destination").offset().top +26
 	}, 1000);
 });
+
+jQuery( document ).ready( function()
+{
+	// Check if .slide-top div exists (used to name back-to-top button)
+	if( $( '.slide-top' )[0] ) {
+		// Scroll to Top
+		// This skin needs to override the default scroll-top script because the `height: 100%` and `overflow: hidden` both exist on disp=front
+		// ======================================================================== /
+		// hide or show the "scroll to top" link
+		$( "body, html, #skin_wrapper" ).scroll( function() {
+			( $(this).scrollTop() > offset ) ? $slide_top.addClass("slide-top-visible") : $slide_top.removeClass("slide-top-visible");
+		});
+
+		-// Smooth scroll to top
+		$( ".slide-top" ).on( "click", function(event) {
+			event.preventDefault();
+			$( "body, html, #skin_wrapper" ).animate({
+				scrollTop: 0,
+			}, scroll_top_duration );
+		});
+	}
+} );
 </script>
 
 <?php

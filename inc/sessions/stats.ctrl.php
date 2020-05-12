@@ -7,7 +7,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}.
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}.
  *
  * @package admin
  */
@@ -30,6 +30,14 @@ $activate_collection_toolbar = true;
 // Do we have permission to view all stats (aggregated stats) ?
 $perm_view_all = $current_User->check_perm( 'stats', 'view' );
 
+// Section ID:
+param( 'sec_ID', 'integer', 0, true );
+if( ! $perm_view_all && ! $current_User->check_perm( 'section', 'view', false, $sec_ID ) )
+{
+	forget_param( 'sec_ID' );
+	unset( $sec_ID );
+}
+
 // We set the default to -1 so that blog=0 will make its way into regenerate_url()s whenever watching global stats.
 memorize_param( 'blog', 'integer', -1 );
 
@@ -50,7 +58,7 @@ if( $tab == 'domains' && $current_User->check_perm( 'stats', 'edit' ) )
 	require_js( 'jquery/jquery.jeditable.js', 'rsc_url' );
 }
 
-if( $blog == 0 || ! $current_User->check_perm( 'stats', 'list', false, $blog ) )
+if( ( $blog == 0 && empty( $sec_ID ) ) || ! $current_User->check_perm( 'stats', 'list', false, $blog ) )
 {
 	if( ! $perm_view_all && isset( $collections_Module ) )
 	{ // Find a blog we can view stats for:
@@ -323,7 +331,14 @@ switch( $action )
 		$UserSettings->dbupdate();
 
 		// Redirect to referer page:
-		header_redirect( $admin_url.'?ctrl=stats&tab='.$tab.'&tab3='.$tab3.'&blog='.$blog, 303 ); // Will EXIT
+		if( param( 'from_ctrl', 'string' ) == 'goals' )
+		{
+			header_redirect( $admin_url.'?ctrl=goals&tab3=stats&blog='.$blog.( empty( $sec_ID ) ? '' : '&sec_ID='.$sec_ID ), 303 ); // Will EXIT
+		}
+		else
+		{
+			header_redirect( $admin_url.'?ctrl=stats&tab='.$tab.'&tab3='.$tab3.'&blog='.$blog.( empty( $sec_ID ) ? '' : '&sec_ID='.$sec_ID ), 303 ); // Will EXIT
+		}
 		// We have EXITed already at this point!!
 		break;
 
@@ -347,7 +362,14 @@ switch( $action )
 		$UserSettings->dbupdate();
 
 		// Redirect to referer page:
-		header_redirect( $admin_url.'?ctrl=stats&tab='.$tab.'&tab3='.$tab3.'&blog='.$blog, 303 ); // Will EXIT
+		if( param( 'from_ctrl', 'string' ) == 'goals' )
+		{
+			header_redirect( $admin_url.'?ctrl=goals&tab3=stats&blog='.$blog, 303 ); // Will EXIT
+		}
+		else
+		{
+			header_redirect( $admin_url.'?ctrl=stats&tab='.$tab.'&tab3='.$tab3.'&blog='.$blog, 303 ); // Will EXIT
+		}
 		// We have EXITed already at this point!!
 		break;
 }
@@ -357,11 +379,12 @@ if( isset( $collections_Module ) && $tab_from != 'antispam' )
 	if( $perm_view_all )
 	{
 		$AdminUI->set_coll_list_params( 'stats', 'view', array( 'ctrl' => 'stats', 'tab' => $tab, 'tab3' => $tab3 ), T_('All'),
-						$admin_url.'?ctrl=stats&amp;tab='.$tab.'&amp;tab3='.$tab3.'&amp;blog=0' );
+						$admin_url.'?ctrl=stats&amp;tab='.$tab.'&amp;tab3='.$tab3.'&amp;blog=0', NULL, false, true );
 	}
 	else
 	{	// No permission to view aggregated stats:
-		$AdminUI->set_coll_list_params( 'stats', 'view', array( 'ctrl' => 'stats', 'tab' => $tab, 'tab3' => $tab3 ) );
+		$AdminUI->set_coll_list_params( 'stats', 'view', array( 'ctrl' => 'stats', 'tab' => $tab, 'tab3' => $tab3 ), NULL,
+						'', NULL, false, true );
 	}
 }
 

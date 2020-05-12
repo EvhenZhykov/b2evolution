@@ -7,7 +7,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}
  *
  * @package evocore
  */
@@ -369,6 +369,7 @@ function search_and_score_items( $search_term, $keywords, $quoted_parts, $exclud
 			'order'         => 'DESC',
 			'posts'         => 1000,
 			'post_ID_list'  => $exclude_posts,
+			'itemtype_usage'=> '-content-block,special',
 		);
 
 	if( ! empty( $authors ) && is_logged_in() )
@@ -948,6 +949,12 @@ function perform_scored_search( $search_keywords, $searched_content_types = 'all
 			$search_result[0]['nr_of_tags'] = count( $tags_search_result );
 		}
 	}
+
+	// Handle searched results by modules:
+	modules_call_method( 'handle_searched_results', array(
+			'keywords' => $search_keywords,
+			'results'  => $search_result,
+		) );
 
 	return $search_result;
 }
@@ -1613,6 +1620,9 @@ function display_search_result( $params = array() )
 			'cell_content_start' => '<div class="result_content">',
 			'cell_content_end'   => '</div>',
 		), $params );
+
+	// Prepare the display params of search result object by modules:
+	modules_call_method_reference_params( 'prepare_search_result_display_params', $params );
 
 	echo $params['row_start'];
 

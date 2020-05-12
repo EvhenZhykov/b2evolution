@@ -7,7 +7,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}
  *
  * @package admin
  */
@@ -20,11 +20,11 @@ global $edited_File, $selected_Filelist;
 
 global $blog, $filename_max_length;
 
-global $Settings;
+global $Settings, $admin_url;
 
 $edit_allowed_perm = $current_User->check_perm( 'files', 'edit_allowed', false, $selected_Filelist->get_FileRoot() );
 
-$Form = new Form( NULL, 'fm_properties_checkchanges' );
+$Form = new Form( $admin_url, 'fm_properties_checkchanges' );
 
 if( get_param( 'mode' ) != 'modal' )
 {

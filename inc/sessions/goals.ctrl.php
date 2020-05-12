@@ -7,7 +7,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}
  *
  * @package admin
  */
@@ -30,6 +30,14 @@ $activate_collection_toolbar = true;
 // Do we have permission to view all stats (aggregated stats) ?
 $perm_view_all = $current_User->check_perm( 'stats', 'view' );
 
+// Section ID:
+param( 'sec_ID', 'integer', 0, true );
+if( ! $perm_view_all && ! $current_User->check_perm( 'section', 'view', false, $sec_ID ) )
+{
+	forget_param( 'sec_ID' );
+	unset( $sec_ID );
+}
+
 $tab3 = param( 'tab3', 'string', 'goals', true );
 $AdminUI->set_path( 'stats', 'goals', $tab3 );
 
@@ -37,12 +45,13 @@ if( isset( $collections_Module ) )
 { // Display list of blogs:
 	if( $perm_view_all )
 	{
-		$AdminUI->set_coll_list_params( 'stats', 'view', array( 'ctrl' => 'stats', 'tab' => 'summary', 'tab3' => 'global' ), T_('All'),
-						$admin_url.'?ctrl=stats&amp;tab=summary&amp;tab3=global&amp;blog=0' );
+		$AdminUI->set_coll_list_params( 'stats', 'view', array( 'ctrl' => 'goals' ), T_('All'),
+						$admin_url.'?ctrl=goals&amp;blog=0', NULL, false, true );
 	}
 	else
 	{ // No permission to view aggregated stats:
-		$AdminUI->set_coll_list_params( 'stats', 'view', array( 'ctrl' => 'stats', 'tab' => 'summary', 'tab3' => $tab3 ) );
+		$AdminUI->set_coll_list_params( 'stats', 'view', array( 'ctrl' => 'goals' ), NULL,
+						'', NULL, false, true );
 	}
 }
 
@@ -366,6 +375,48 @@ switch( $action )
 		}
 		break;
 
+	case 'aggregate':
+		// Aggregate the goal hits:
+
+		// Check that this action request is not a CSRF hacked request:
+		$Session->assert_received_crumb( 'aggregate' );
+
+		// Check permission:
+		$current_User->check_perm( 'stats', 'edit', true );
+
+		load_class( 'sessions/model/_hitlist.class.php', 'Hitlist' );
+
+		// Do the aggregations:
+		Hitlist::aggregate_goal_hits();
+
+		$Messages->add( T_('The goal hits have been aggregated.'), 'success' );
+
+		// Redirect to referer page:
+		header_redirect( $admin_url.'?ctrl=goals&tab3='.$tab3.'&blog='.$blog, 303 ); // Will EXIT
+		// We have EXITed already at this point!!
+		break;
+
+	case 'prune': // PRUNE goal hits for a certain date
+		// Check that this action request is not a CSRF hacked request:
+		$Session->assert_received_crumb( 'goals' );
+
+		// Check permission:
+		$current_User->check_perm( 'stats', 'edit', true );
+
+		param( 'date', 'integer', true ); // Required!
+		if( $r = Hitlist::prune_goal_hits( $date ) )
+		{
+			$Messages->add( sprintf( /* TRANS: %s is a date */ T_('Deleted %d goal hits for %s.'), $r, date( locale_datefmt(), $date ) ), 'success' );
+		}
+		else
+		{
+			$Messages->add( sprintf( /* TRANS: %s is a date */ T_('No goal hits deleted for %s.'), date( locale_datefmt(), $date ) ), 'note' );
+		}
+		// Redirect so that a reload doesn't write to the DB twice:
+		header_redirect( '?ctrl=stats&blog='.$blog, 303 ); // Will EXIT
+		// We have EXITed already at this point!!
+		break;
+
 }
 
 $AdminUI->breadcrumbpath_init();
@@ -381,6 +432,12 @@ switch( $tab3 )
 		$AdminUI->set_page_manual_link( 'goal-settings' );
 		break;
 	case 'stats':
+		param( 'hits_summary_mode', 'string' );
+		if( ! empty( $hits_summary_mode ) )
+		{	// Save a selected mode of hits summary data in session variable:
+			$Session->set( 'hits_summary_mode', $hits_summary_mode );
+		}
+
 		$AdminUI->breadcrumbpath_add( T_('Goal hit stats'), '?ctrl=goals&amp;tab3=stats&amp;blog=$blog$' );
 		$AdminUI->set_page_manual_link( 'goal-stats' );
 		// Init jqPlot charts
@@ -464,6 +521,7 @@ switch( $action )
 				break;
 
 			case 'stats':
+				load_funcs( 'sessions/views/_stats_view.funcs.php' );
 				$AdminUI->disp_view( 'sessions/views/_goal_hitsummary.view.php' );
 				break;
 		}

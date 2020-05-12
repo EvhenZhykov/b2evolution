@@ -10,7 +10,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}
  * Parts of this file are copyright (c)2004-2006 by Daniel HAHLER - {@link http://thequod.de/contact}.
  * Parts of this file are copyright (c)2005-2006 by PROGIDISTRI - {@link http://progidistri.com/}.
  *
@@ -495,7 +495,7 @@ if( ! empty( $login_error ) || ( $login_required && ! is_logged_in() ) )
 			$email = $current_User->email;
 		}
 
-		if( empty( $Blog ) && init_requested_blog() )
+		if( empty( $Blog ) && init_requested_coll_or_process_tinyurl( false, false ) )
 		{ // $blog is set, init $Blog also
 			$BlogCache = & get_BlogCache();
 			$Collection = $Blog = $BlogCache->get_by_ID( $blog, false, false );

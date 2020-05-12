@@ -14,7 +14,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}
  * Parts of this file are copyright (c)2004-2006 by Daniel HAHLER - {@link http://thequod.de/contact}.
  * Parts of this file are copyright (c)2005-2006 by PROGIDISTRI - {@link http://progidistri.com/}.
  *
@@ -683,36 +683,14 @@ switch( $action )
 			break;
 		}
 
-		// Load class to work with ZIP files:
-		load_class( '_ext/_zip_archives.php', 'zip_file' );
-
-		$arraylist = $selected_Filelist->get_array( 'get_name' );
-
-		$options = array (
-			'basedir' => $fm_Filelist->get_ads_list_path(),
-			// Keep zip archive in memory only ifor download action:
-			'inmemory' => ( $action == 'download' ),
-			'recurse' => (1 - $exclude_sd),
-		);
-
-		// Create ZIP archive:
-		$zipfile = new zip_file( $zipname );
-		$zipfile->set_options( $options );
-		$zipfile->add_files( $arraylist, array( '_evocache' ) );
-		$zipfile->create_archive();
-
-		if( $zipfile->error )
-		{
-			foreach( $zipfile->error as $v )
-			{
-				$Messages->add( $v, 'error' );
-			}
+		if( ! pack_archive( $fm_Filelist->get_ads_list_path().$zipname, $fm_Filelist->get_ads_list_path(), $selected_Filelist->get_array( 'get_name' ), '', ( $exclude_sd ? 'subdirs' : array() ), 'msg_error' ) )
+		{	// Stop on error packing:
 			break;
 		}
 
 		if( $action == 'download' )
 		{	// Download ZIP archive:
-			$zipfile->download_file();
+			download_archive( $fm_Filelist->get_ads_list_path().$zipname );
 			exit(0);
 			/* EXITED! */
 		}
@@ -760,6 +738,19 @@ switch( $action )
 		}
 		break;
 
+	case 'unpack_zip':
+		// Unpack selected ZIP archives:
+
+		// Check permission for action to edit files in the selected File Root:
+		$current_User->check_perm( 'files', 'edit_allowed', true, $selected_Filelist->get_FileRoot() );
+
+		if( ! $selected_Filelist->count() )
+		{
+			$Messages->add( T_('Nothing selected.'), 'error' );
+			$action = 'list';
+			break;
+		}
+		break;
 
 	case 'rename':
 	case 'move_copy':
@@ -1294,6 +1285,10 @@ switch( $action )
 
 		$edited_File = & $selected_Filelist->get_by_idx(0);
 		$edited_File->load_meta();
+
+		param( 'link_owner_type', 'string', '', true );
+		param( 'link_owner_ID', 'integer', 0, true );
+		param( 'from', 'string', '', true );
 		break;
 
 
@@ -1306,6 +1301,10 @@ switch( $action )
 
 		// Check permission!
 		$current_User->check_perm( 'files', 'edit_allowed', true, $selected_Filelist->get_FileRoot() );
+
+		param( 'link_owner_type', 'string', '' );
+		param( 'link_owner_ID', 'integer', 0 );
+		param( 'from', 'string', '' );
 
 		$edited_File = & $selected_Filelist->get_by_idx(0);
 		$error_occured = false;
@@ -1378,13 +1377,27 @@ switch( $action )
 			}
 		}
 
-		// Redirect so that a reload doesn't write to the DB twice:
-		if( $error_occured )
-		{
-			header_redirect( regenerate_url( 'fm_selected', 'action=edit_properties&amp;fm_selected[]='.rawurlencode($edited_File->get_rdfp_rel_path() ).'&amp;'.url_crumb('file'), '', '&' ), 303 );
-			// We have EXITed already, no need else.
+		if( $mode == 'link' )
+		{	// Don't redirect when we updated a linked File:
+			exit;
 		}
-		header_redirect( regenerate_url( '', '', '', '&' ), 303 ); // Will EXIT
+
+		if( $LinkOwner = & get_LinkOwner( $link_owner_type, $link_owner_ID ) )
+		{	// Redirect back to link owner object edit form where the File was edited:
+			$redirect_to = $LinkOwner->get_edit_url( '&', ( $from == 'backoffice' ) );
+		}
+
+		// Redirect so that a reload doesn't write to the DB twice:
+		if( empty( $redirect_to ) )
+		{
+			if( $error_occured )
+			{
+				$redirect_to = regenerate_url( 'fm_selected', 'action=edit_properties&amp;fm_selected[]='.rawurlencode($edited_File->get_rdfp_rel_path() ).'&amp;'.url_crumb('file'), '', '&' );
+				// We have EXITed already, no need else.
+			}
+			$redirect_to = regenerate_url( '', '', '', '&' );
+		}
+		header_redirect( $redirect_to, 303 ); // Will EXIT
 		// We have EXITed already at this point!!
 		break;
 
@@ -1770,6 +1783,10 @@ if( !empty( $action ) && $action != 'list' && $action != 'nil' )
 
 		case 'create_zip':
 			$AdminUI->disp_view( 'files/views/_file_create_zip.form.php' );
+			break;
+
+		case 'unpack_zip':
+			$AdminUI->disp_view( 'files/views/_file_unpack_zip.view.php' );
 			break;
 
 		case 'edit_perms':

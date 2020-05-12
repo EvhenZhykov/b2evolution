@@ -1,13 +1,13 @@
 <?php
 /**
- * This file implements the Current filters Widget class.
+ * This file implements the Current Item filters Widget class.
  *
  * This file is part of the evoCore framework - {@link http://evocore.net/}
  * See also {@link https://github.com/b2evolution/b2evolution}.
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}
  * Parts of this file are copyright (c)2008 by Daniel HAHLER - {@link http://daniel.hahler.de/}.
  *
  * @package evocore
@@ -53,7 +53,7 @@ class coll_current_filters_Widget extends ComponentWidget
 	 */
 	function get_name()
 	{
-		return T_('Current filters');
+		return T_('Current Item filters');
 	}
 
 
@@ -71,7 +71,7 @@ class coll_current_filters_Widget extends ComponentWidget
 	 */
 	function get_desc()
 	{
-		return T_('Summary of the current filters.');
+		return T_('Summary of the current Item filters.');
 	}
 
 
@@ -87,7 +87,7 @@ class coll_current_filters_Widget extends ComponentWidget
 			'title' => array(
 					'type' => 'text',
 					'label' => T_('Block title'),
-					'defaultvalue' => T_('Current filters'),
+					'defaultvalue' => T_('Current Item filters'),
 					'maxlength' => 100,
 				),
 			'show_filters' => array(
@@ -102,10 +102,13 @@ class coll_current_filters_Widget extends ComponentWidget
 						array( 'assignee', T_('Assignee'), 1 ),
 						array( 'locale', T_('Locale'), 1 ),
 						array( 'status', T_('Status'), 1 ),
+						array( 'itemtype', T_('Item Type'), 0 ),
 						array( 'visibility', T_('Visibility'), 0 ),
 						array( 'time', T_('Past/Future'), 0 ),
 						array( 'limit', T_('Limit by days'), 1 ),
-						array( 'flagged', T_('Flagged'), 1 ) ),
+						array( 'flagged', T_('Flagged'), 1 ),
+						array( 'mustread', T_('Must read'), 1 ),
+					),
 				),
 			), parent::get_param_definitions( $params ) );
 
@@ -130,6 +133,7 @@ class coll_current_filters_Widget extends ComponentWidget
 
 		if( empty( $params['ItemList'] ) )
 		{ // Empty ItemList object
+			$this->display_debug_message( 'Widget "'.$this->get_name().'" is hidden because there is an empty param "ItemList".' );
 			return false;
 		}
 
@@ -176,14 +180,17 @@ class coll_current_filters_Widget extends ComponentWidget
 				'display_locale'     => ! empty( $this->disp_params['show_filters']['locale'] ),
 				'display_status'     => ! empty( $this->disp_params['show_filters']['status'] ),
 				'display_visibility' => ! empty( $this->disp_params['show_filters']['visibility'] ),
+				'display_itemtype'   => ! empty( $this->disp_params['show_filters']['itemtype'] ),
 				'display_time'       => ! empty( $this->disp_params['show_filters']['time'] ),
 				'display_limit'      => ! empty( $this->disp_params['show_filters']['limit'] ),
 				'display_flagged'    => ! empty( $this->disp_params['show_filters']['flagged'] ),
+				'display_mustread'   => ! empty( $this->disp_params['show_filters']['mustread'] ),
 			) ) );
 
 		if( empty( $filters ) && ! $params['display_empty_filter'] )
-		{ // No filters
-			return;
+		{	// No filters
+			$this->display_debug_message( 'Widget "'.$this->get_name().'" is hidden because there are no filters.' );
+			return false;
 		}
 
 		// START DISPLAY:
@@ -215,7 +222,7 @@ class coll_current_filters_Widget extends ComponentWidget
 
 			if( $params['display_button_reset'] )
 			{ // Button to reset all filters
-				echo '<p>'.action_icon( T_('Reset all filters!'), 'reset_filters',
+				echo '<p>'.action_icon( T_('Remove filters'), 'reset_filters',
 					regenerate_url( 'catsel,cat,'
 						.$params['ItemList']->param_prefix.'tag,'
 						.$params['ItemList']->param_prefix.'author,'
@@ -239,8 +246,9 @@ class coll_current_filters_Widget extends ComponentWidget
 						.$params['ItemList']->param_prefix.'dstop,'
 						.$params['ItemList']->param_prefix.'show_past,'
 						.$params['ItemList']->param_prefix.'show_future,'
-						.$params['ItemList']->param_prefix.'flagged' ),
-					' '.T_('Reset all filters!'), 3, 4 ).'<p>';
+						.$params['ItemList']->param_prefix.'flagged,'
+						.$params['ItemList']->param_prefix.'mustread' ),
+					' '.T_('Remove filters'), 3, 4 ).'<p>';
 			}
 		}
 

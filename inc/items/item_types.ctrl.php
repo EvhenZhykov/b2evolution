@@ -7,7 +7,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}
  *
  * @package admin
  */
@@ -296,7 +296,7 @@ switch( $action )
 // Generate available blogs list:
 $AdminUI->set_coll_list_params( 'blog_ismember', 'view', array( 'ctrl' => 'itemtypes', 'tab' => $tab, 'tab3' => 'types' ) );
 
-$AdminUI->breadcrumbpath_init( true, array( 'text' => T_('Collections'), 'url' => $admin_url.'?ctrl=coll_settings&amp;tab=dashboard&amp;blog=$blog$' ) );
+$AdminUI->breadcrumbpath_init( true, array( 'text' => T_('Collections'), 'url' => $admin_url.'?ctrl=collections' ) );
 $AdminUI->breadcrumbpath_add( T_('Settings'), $admin_url.'?ctrl=coll_settings&amp;blog=$blog$&amp;tab=general' );
 $AdminUI->breadcrumbpath_add( T_('Post Types'), $admin_url.'?ctrl=itemtypes&amp;blog=$blog$&amp;tab=settings&amp;tab3=types' );
 
@@ -358,14 +358,18 @@ switch( $action )
 		param( 'itcf_order', 'integer' );
 		param( 'itcf_label', 'string' );
 		param( 'itcf_name', 'string' );
+		param( 'itcf_schema_prop', 'string' );
 		param( 'itcf_format', 'string' );
 		param( 'itcf_formula', 'string' );
+		param( 'itcf_disp_condition', 'string' );
 		param( 'itcf_header_class', 'string' );
 		param( 'itcf_cell_class', 'string' );
 		param( 'itcf_link', 'string' );
 		param( 'itcf_link_nofollow', 'integer', NULL );
 		param( 'itcf_link_class', 'string' );
 		param( 'itcf_note', 'string' );
+		param( 'itcf_required', 'integer' );
+		param( 'itcf_meta', 'integer' );
 		param( 'itcf_public', 'integer' );
 		param( 'itcf_line_highlight', 'string' );
 		param( 'itcf_green_highlight', 'string' );

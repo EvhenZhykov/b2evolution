@@ -7,7 +7,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}.
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}.
  *
  * {@internal Below is a list of authors who have contributed to design/coding of this file: }}
  *
@@ -53,6 +53,17 @@ $Form->hidden_ctrl();
 $Form->hidden( 'action', 'update' );
 $Form->hidden( 'tab', 'seo' );
 $Form->hidden( 'blog', $edited_Blog->ID );
+
+$Form->begin_fieldset( T_('General').get_manual_link( 'general-seo' ) );
+	$Form->checkbox( 'tags_open_graph', $edited_Blog->get_setting( 'tags_open_graph' ), T_('Open Graph'),
+			sprintf( /* TRANS: %s replaced with <code><head></code> */ T_('Include Open Graph tags in the %s section'), '<code>&lt;head&gt;</code>' ).' (og:title, og:url, og:description, og:type and og:image)' );
+
+	$Form->checkbox( 'tags_twitter_card', $edited_Blog->get_setting( 'tags_twitter_card' ), T_('Twitter Card'),
+			sprintf( /* TRANS: %s replaced with <code><head></code> */ T_('Include Twitter Summary card in the %s section'), '<code>&lt;head&gt;</code>' ) );
+
+	$Form->checkbox( 'tags_structured_data', $edited_Blog->get_setting( 'tags_structured_data' ), T_('Structured Data'),
+			sprintf( /* TRANS: %s replaced with <code></body></code> */ T_('Include Structured Data before %s'), '<code>&lt;/body&gt;</code>' ) );
+$Form->end_fieldset();
 
 $Form->begin_fieldset( T_('Special Front Page').' <span class="text-muted">(disp=front)</span>'.get_manual_link( 'special-front-page-seo' ) );
 	$Form->checkbox( 'default_noindex', $edited_Blog->get_setting( 'default_noindex' ), T_('Indexing'), T_('META NOINDEX') );
@@ -104,6 +115,8 @@ $Form->end_fieldset();
 
 $Form->begin_fieldset( T_('Single post pages / "Permalink" pages').get_manual_link('single-post-pages-seo') );
 
+	$Form->checkbox( 'single_noindex', $edited_Blog->get_setting( 'single_noindex' ), T_('Indexing'), T_('META NOINDEX') );
+
 	$Form->radio( 'single_links', $edited_Blog->get_setting('single_links'),
 		array(
 			  array( 'param_num', T_('Use param: post ID'), T_('E-g: ')
@@ -127,7 +140,7 @@ $Form->begin_fieldset( T_('Single post pages / "Permalink" pages').get_manual_li
 	$Form->text_input( 'slug_limit', $edited_Blog->get_setting('slug_limit'), 3, T_('Limit slug length to'), '', array( 'input_suffix' => ' '.T_('words') ) );
 
 	$Form->checklist( array(
-		array( 'canonical_item_urls', 1, T_('301 redirect to canonical URL when possible'), $edited_Blog->get_setting( 'canonical_item_urls' ) ),
+		array( 'canonical_item_urls', 1, sprintf( T_('301 redirect to canonical URL when possible (but not to <a %s>External canonical URL</a> %s)'), 'href="'.get_manual_url( 'external-canonical-url' ).'"', get_pro_label() ), $edited_Blog->get_setting( 'canonical_item_urls' ) ),
 		array( 'allow_crosspost_urls', 1, T_('Do not 301 redirect cross-posted Items'), $edited_Blog->get_setting( 'allow_crosspost_urls' ), ! $edited_Blog->get_setting( 'canonical_item_urls' ) ),
 		array( 'relcanonical_item_urls', 1, T_('Use rel="canonical" whenever necessary'), $edited_Blog->get_setting( 'relcanonical_item_urls' ) ),
 		array( 'self_canonical_item_urls', 1, T_('Use rel="canonical" even when not necessary (self-refering)'), $edited_Blog->get_setting( 'self_canonical_item_urls' ) ),
@@ -138,13 +151,6 @@ $Form->begin_fieldset( T_('Single post pages / "Permalink" pages').get_manual_li
 
 	$Form->checkbox( 'tags_meta_keywords', $edited_Blog->get_setting( 'tags_meta_keywords' ),
 			T_('Meta Keywords'), T_('When no meta keywords are provided for an item, use tags instead.') );
-
-	$Form->checkbox( 'tags_open_graph', $edited_Blog->get_setting( 'tags_open_graph' ),
-			T_('Open Graph'), T_('Open Graph tags').' (og:title, og:url, og:description, og:type and og:image)' );
-
-	$Form->checkbox( 'tags_twitter_card', $edited_Blog->get_setting( 'tags_twitter_card' ),
-			T_('Twitter Card'), T_('Include Twitter Summary card') );
-
 $Form->end_fieldset();
 
 $Form->begin_fieldset( T_('"By date" archives').get_manual_link('archive-pages-seo') );
@@ -334,11 +340,21 @@ $Form->begin_fieldset( T_('Other filtered pages').get_manual_link('other-filtere
 			), T_('Post contents'), true );
 $Form->end_fieldset();
 
+$Form->begin_fieldset( T_('Download pages').get_manual_link( 'download-display-seo' ) );
+	$Form->checkbox( 'download_noindex', $edited_Blog->get_setting( 'download_noindex' ), T_('Indexing'), T_('META NOINDEX') );
+	$Form->checkbox( 'download_nofollowto', $edited_Blog->get_setting( 'download_nofollowto' ), T_('No Follow TO'), T_('NOFOLLOW on links leading to download pages') );
+$Form->end_fieldset();
+
+$Form->begin_fieldset( T_('Contact/Message Form pages').get_manual_link( 'contact-message-form-pages-seo' ) );
+	$Form->checkbox( 'msgform_noindex', $edited_Blog->get_setting( 'msgform_noindex' ), T_('Indexing'),
+										T_('META NOINDEX').' - '.T_('WARNING: Letting search engines index contact forms will attract spam.') );
+	$Form->checkbox( 'msgform_nofollowto', $edited_Blog->get_setting( 'msgform_nofollowto' ), T_('No Follow TO'), T_('NOFOLLOW on links leading to contact/message form pages') );
+	$Form->text_input( 'msgform_redirect_slug', $edited_Blog->get_setting( 'msgform_redirect_slug' ), 100, T_('Default redirect after message send'), T_('Enter slug or leave empty to redirect to front page of current collection.') );
+$Form->end_fieldset();
+
 $Form->begin_fieldset( T_('Other pages').get_manual_link('other-pages-seo') );
 	$Form->checkbox( 'feedback-popup_noindex', $edited_Blog->get_setting( 'feedback-popup_noindex' ), T_('Comment popups'),
 										T_('META NOINDEX').' - '.T_('For skins with comment popups only.') );
-	$Form->checkbox( 'msgform_noindex', $edited_Blog->get_setting( 'msgform_noindex' ), T_('Contact forms'),
-										T_('META NOINDEX').' - '.T_('WARNING: Letting search engines index contact forms will attract spam.') );
 	$Form->checkbox( 'special_noindex', $edited_Blog->get_setting( 'special_noindex' ), T_('Other special pages'),
 										T_('META NOINDEX').' - '.T_('Pages with no index setting of their own... yet.') );
 	$Form->radio( '404_response', $edited_Blog->get_setting('404_response'),
@@ -360,11 +376,6 @@ $Form->begin_fieldset( T_('Other pages').get_manual_link('other-pages-seo') );
 			), T_('Help page'), true );
 $Form->end_fieldset();
 
-$Form->begin_fieldset( T_('Download pages').get_manual_link( 'download-display-seo' ) );
-	$Form->checkbox( 'download_noindex', $edited_Blog->get_setting( 'download_noindex' ), T_('Indexing'), T_('META NOINDEX') );
-	$Form->checkbox( 'download_nofollowto', $edited_Blog->get_setting( 'download_nofollowto' ), T_('No Follow TO'), T_('NOFOLLOW on links leading to download pages') );
-$Form->end_fieldset();
-
 
 $Form->end_form( array( array( 'submit', 'submit', T_('Save Changes!'), 'SaveButton' ) ) );
 
@@ -375,8 +386,8 @@ jQuery( 'input[name=canonical_item_urls]' ).click( function()
 	var canonical_item_urls_is_unchecked = ! jQuery( this ).prop( 'checked' );
 	jQuery( 'input[name=allow_crosspost_urls]' ).prop( 'disabled', canonical_item_urls_is_unchecked );
 	if( canonical_item_urls_is_unchecked )
-	{
-		jQuery( 'input[name=allow_crosspost_urls]' ).prop( 'checked', false );
+	{	// When "301 redirect to canonical URL" is disabled then we always must NOT do 301 redirect cross-posted Items:
+		jQuery( 'input[name=allow_crosspost_urls]' ).prop( 'checked', true );
 	}
 } );
 </script>

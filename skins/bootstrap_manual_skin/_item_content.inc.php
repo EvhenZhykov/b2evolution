@@ -8,7 +8,7 @@
  *
  * b2evolution - {@link http://b2evolution.net/}
  * Released under GNU GPL License - {@link http://b2evolution.net/about/gnu-gpl-license}
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}
  *
  * @package evoskins
  */
@@ -43,6 +43,14 @@ $params = array_merge( array(
 		'content_start_full_text'  => '<div class="evo_post__full_text clearfix">',
 		'content_end_full_text'    => '</div>',
 
+		// In case we display a CONTENT BLOCK (included in another post by short tag [include:item-slug]):
+		'content_block_start'         => '<div class="evo_content_block $cb_class$">',
+		'content_block_end'           => '</div>',
+		'content_block_before_images' => '<div class="evo_content_block_images">',
+		'content_block_after_images'  => '</div>',
+		'content_block_before_text'   => '<div class="evo_content_block_text">',
+		'content_block_after_text'    => '</div>',
+
 		'before_content_teaser'    => '',
 		'after_content_teaser'     => '',
 		'before_content_extension' => '',
@@ -55,7 +63,10 @@ $params = array_merge( array(
 		'after_image'              => '</figure>',
 		'after_images'             => '</div>',
 		'image_class'              => 'img-responsive',
-		'image_size'               => 'fit-1280x720',
+		'image_size'               => get_skin_setting( 'main_content_image_size', 'fit-1280x720' ), // Standard size (for old browsers)
+// TODO: it makes no sense to use a skin setting for standard size but not have matching image_sizes.		
+		'image_sizes'					=> '(max-width: 430px) 400px, (max-width: 670px) 640px, (max-width: 991px) 720px, (max-width: 1199px) 698px, 848px',
+													// Note: first we handle margins 15+640+15 = 670 in the fluid domain, then we work with bootstrap breakpoints
 		'image_limit'              =>  1000,
 		'image_link_to'            => 'original', // Can be 'original', 'single' or empty
 		'excerpt_image_class'      => '',
@@ -111,39 +122,7 @@ else
 {
 	$content_mode = $params['content_mode'];
 }
-if( $content_mode == 'auto' )
-{
-	// echo $disp_detail;
-	switch( $disp_detail )
-	{
-		case 'posts-cat':
-		case 'posts-topcat':
-		case 'posts-subcat':
-			$content_mode = $Blog->get_setting('chapter_content');
-			break;
-
-		case 'posts-tag':
-			$content_mode = $Blog->get_setting('tag_content');
-			break;
-
-		case 'posts-date':
-			$content_mode = $Blog->get_setting('archive_content');
-			break;
-
-		case 'single':
-		case 'page':
-			$content_mode = 'full';
-			break;
-
-		case 'posts-default':  // home page 1
-		case 'posts-next':     // next page 2, 3, etc
-			$content_mode = $Blog->get_setting('main_content');
-			break;
-
-		default: // posts-filtered, search, flagged and etc.
-			$content_mode = $Blog->get_setting('filtered_content');
-	}
-}
+$content_mode = resolve_auto_content_mode( $content_mode );
 
 if( $params['include_cover_images'] )
 { // Include the cover images on teaser place
@@ -224,6 +203,7 @@ switch( $content_mode )
 					'after'               => $params['after_images'],
 					'image_class'         => $params['image_class'],
 					'image_size'          => $params['image_size'],
+					'image_sizes'         => $params['image_sizes'],
 					'limit'               => $params['image_limit'],
 					'image_link_to'       => $params['image_link_to'],
 					'before_gallery'      => $params['before_gallery'],
@@ -250,6 +230,12 @@ switch( $content_mode )
 
 			// Display CONTENT (at least the TEASER part):
 			$Item->content_teaser( array(
+					'content_block_start'         => $params['content_block_start'],
+					'content_block_end'           => $params['content_block_end'],
+					'content_block_before_images' => $params['content_block_before_images'],
+					'content_block_after_images'  => $params['content_block_after_images'],
+					'content_block_before_text'   => $params['content_block_before_text'],
+					'content_block_after_text'    => $params['content_block_after_text'],
 					'before'              => $params['before_content_teaser'],
 					'after'               => $params['after_content_teaser'],
 					'before_image'        => $params['before_image'],
@@ -258,6 +244,7 @@ switch( $content_mode )
 					'after_image'         => $params['after_image'],
 					'image_class'         => $params['image_class'],
 					'image_size'          => $params['image_size'],
+					'image_sizes'         => $params['image_sizes'],
 					'limit'               => $params['image_limit'],
 					'image_link_to'       => $params['image_link_to'],
 					'before_gallery'      => $params['before_gallery'],
@@ -295,6 +282,7 @@ switch( $content_mode )
 						'after'               => $params['after_images'],
 						'image_class'         => $params['image_class'],
 						'image_size'          => $params['image_size'],
+						'image_sizes'         => $params['image_sizes'],
 						'limit'               => $params['image_limit'],
 						'image_link_to'       => $params['image_link_to'],
 						'before_gallery'      => $params['before_gallery'],
@@ -316,6 +304,12 @@ switch( $content_mode )
 
 			// Display the "after more" part of the text: (part after "[teaserbreak]")
 			$Item->content_extension( array(
+					'content_block_start'         => $params['content_block_start'],
+					'content_block_end'           => $params['content_block_end'],
+					'content_block_before_images' => $params['content_block_before_images'],
+					'content_block_after_images'  => $params['content_block_after_images'],
+					'content_block_before_text'   => $params['content_block_before_text'],
+					'content_block_after_text'    => $params['content_block_after_text'],
 					'before'              => $params['before_content_extension'],
 					'after'               => $params['after_content_extension'],
 					'before_image'        => $params['before_image'],
@@ -324,6 +318,7 @@ switch( $content_mode )
 					'after_image'         => $params['after_image'],
 					'image_class'         => $params['image_class'],
 					'image_size'          => $params['image_size'],
+					'image_sizes'         => $params['image_sizes'],
 					'limit'               => $params['image_limit'],
 					'image_link_to'       => $params['image_link_to'],
 					'force_more'          => $params['force_more'],

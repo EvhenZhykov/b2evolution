@@ -4,7 +4,7 @@
  *
  * b2evolution - {@link http://b2evolution.net/}
  * Released under GNU GPL License - {@link http://b2evolution.net/about/gnu-gpl-license}
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}
  * Parts of this file are copyright (c)2004-2005 by Daniel HAHLER - {@link http://thequod.de/contact}.
  *
  * @package admin
@@ -31,13 +31,13 @@ if( $edited_Blog->ID == 0 )
 	$kind_title = get_collection_kinds( $kind );
 	$form_title = sprintf( T_('New "%s" collection'), $kind_title ).':';
 
-	$Form->global_icon( T_('Abort creating new collection'), 'close', $admin_url.'?ctrl=dashboard', ' '.sprintf( T_('Abort new "%s" collection'), $kind_title ), 3, 3 );
+	$Form->global_icon( T_('Abort creating new collection'), 'close', $admin_url.'?ctrl=collections', ' '.sprintf( T_('Abort new "%s" collection'), $kind_title ), 3, 3 );
 }
 elseif( $action == 'copy' )
 {	// Copy collection form:
 	$form_title = sprintf( T_('Duplicate "%s" collection'), $duplicating_collection_name ).':';
 
-	$Form->global_icon( T_('Abort duplicating collection'), 'close', $admin_url.'?ctrl=dashboard', ' '.T_('Abort duplicating collection'), 3, 3 );
+	$Form->global_icon( T_('Abort duplicating collection'), 'close', $admin_url.'?ctrl=collections', ' '.T_('Abort duplicating collection'), 3, 3 );
 }
 
 $Form->begin_form( 'fform', $form_title );
@@ -53,7 +53,7 @@ if( $next_action == 'create' )
 }
 else
 {
-	$Form->hidden( 'blog', $blog );
+	$Form->hidden( 'blog', $edited_Blog->ID );
 }
 
 if( ! empty( $edited_Blog->confirmation ) )
@@ -123,10 +123,6 @@ $Form->begin_fieldset( T_('Collection type').get_manual_link( 'collection-type-p
 		}
 
 		$set_as_options = array();
-		if( ! $Settings->get( 'info_blog_ID' ) )
-		{
-			$set_as_options[] = array( 'set_as_info_blog', 1, T_('Collection for info pages'), param( 'set_as_info_blog', 'boolean', $set_as_checked ) );
-		}
 		if( ! $Settings->get( 'login_blog_ID' ) )
 		{
 			$set_as_options[] = array( 'set_as_login_blog', 1, T_('Collection for login/registration'), param( 'set_as_login_blog', 'boolean', $set_as_checked ) );
@@ -134,6 +130,10 @@ $Form->begin_fieldset( T_('Collection type').get_manual_link( 'collection-type-p
 		if( ! $Settings->get( 'msg_blog_ID' ) )
 		{
 			$set_as_options[] = array( 'set_as_msg_blog', 1, T_('Collection for profiles/messaging'), param( 'set_as_msg_blog', 'boolean', $set_as_checked ) );
+		}
+		if( ! $Settings->get( 'info_blog_ID' ) )
+		{
+			$set_as_options[] = array( 'set_as_info_blog', 1, T_('Collection for shared content blocks'), param( 'set_as_info_blog', 'boolean', $set_as_checked ) );
 		}
 
 		if( $set_as_options )
@@ -155,41 +155,47 @@ $Form->begin_fieldset( T_('Collection type').get_manual_link( 'collection-type-p
 $Form->end_fieldset();
 
 if( in_array( $action, array( 'create', 'new-name' ) ) && $ctrl = 'collections' )
-{ // Only show demo content option when creating a new collection
+{	// Only show demo content option when creating a new collection
+	load_funcs( 'dashboard/model/_dashboard.funcs.php' );
+
 	$Form->begin_fieldset( T_( 'Demo contents' ).get_manual_link( 'collection-demo-content' ) );
 		$Form->radio( 'create_demo_contents', param( 'create_demo_contents', 'integer', -1 ),
 					array(
 						array( 1, T_('Initialize this collection with some demo contents') ),
 						array( 0, T_('Create an empty collection') ),
 					), T_('New contents'), true, '', true );
-		if( $current_User->check_perm( 'orgs', 'create', false ) && $current_User->check_perm( 'blog_admin', 'editall', false ) )
-		{ // Permission to create organizations
-			$Form->checkbox( 'create_demo_org', param( 'create_demo_org', 'integer', 1 ),
-					T_( 'Create demo organization' ), T_( 'Create a demo organization if none exists.' ) );
+
+		if( get_table_count( 'T_users__organization' ) === 0 )
+		{
+			if( $current_User->check_perm( 'orgs', 'create', false ) && $current_User->check_perm( 'blog_admin', 'editall', false ) )
+			{	// Permission to create organizations
+				$Form->checkbox( 'create_demo_org', param( 'create_demo_org', 'integer', 1 ),
+						T_( 'Create demo organization' ), T_( 'Create a demo organization if none exists.' ) );
+			}
 		}
 
-		if( $current_User->check_perm( 'users', 'edit', false ) && $current_User->check_perm( 'blog_admin', 'editall', false ) )
-		{ // Permission to edit users
-			$Form->checkbox( 'create_demo_users', param( 'create_demo_users', 'integer', 1 ),
-					T_( 'Create demo users' ), T_( 'Create demo users as comment authors.' ) );
+		if( get_table_count( 'T_users', 'user_ID != 1' ) === 0 )
+		{
+			if( $current_User->check_perm( 'users', 'edit', false ) && $current_User->check_perm( 'blog_admin', 'editall', false ) )
+			{	// Permission to edit users
+				$Form->checkbox( 'create_demo_users', param( 'create_demo_users', 'integer', 1 ),
+						T_( 'Create demo users' ), T_( 'Create demo users as comment authors.' ) );
+			}
 		}
 	$Form->end_fieldset();
 }
 
-$Form->begin_fieldset( T_('General parameters').get_manual_link( 'blogs-general-parameters' ), array( 'class'=>'fieldset clear' ) );
-
-	$collection_logo_params = array( 'file_type' => 'image', 'max_file_num' => 1, 'window_title' => T_('Select collection logo/image'), 'root' => 'shared_0', 'size_name' => 'fit-320x320' );
-	$Form->fileselect( 'collection_logo_file_ID', $edited_Blog->get_setting( 'collection_logo_file_ID' ), T_('Collection logo/image'), NULL, $collection_logo_params );
+$Form->begin_fieldset( T_('Branding').get_manual_link( 'collection-settings-branding' ), array( 'class'=>'fieldset clear' ) );
 
 	$name_chars_count = utf8_strlen( html_entity_decode( $edited_Blog->get( 'name' ) ) );
 	$Form->text( 'blog_name', $edited_Blog->get( 'name' ), 50, T_('Title'), T_('Will be displayed on top of the blog.')
 		.' ('.sprintf( T_('%s characters'), '<span id="blog_name_chars_count">'.$name_chars_count.'</span>' ).')', 255 );
 
-
 	$blog_shortname = $action == 'copy' ? NULL : $edited_Blog->get( 'shortname' );
 	$Form->text( 'blog_shortname', $blog_shortname, 15, T_('Short name'), T_('Will be used in selection menus and throughout the admin interface.'), 255 );
 
-	if( $current_User->check_perm( 'blog_admin', 'edit', false, $edited_Blog->ID ) )
+	if( $current_User->check_perm( 'blog_admin', 'edit', false, $edited_Blog->ID ) ||
+	    $current_User->check_perm( 'blogs', 'create', false, $edited_Blog->sec_ID ) )
 	{ // Permission to edit advanced admin settings
 		$blog_urlname = $action == 'copy' ? NULL : $edited_Blog->get( 'urlname' );
 		$Form->text( 'blog_urlname', $blog_urlname, 20, T_('URL "filename"'),
@@ -245,6 +251,21 @@ $Form->begin_fieldset( T_('General parameters').get_manual_link( 'blogs-general-
 		<?php
 	}
 
+	$collection_logo_params = array( 'file_type' => 'image', 'max_file_num' => 1, 'window_title' => T_('Select collection logo/image'), 'root' => 'shared_0', 'size_name' => 'fit-320x320' );
+	$Form->fileselect( 'collection_logo_file_ID', $edited_Blog->get_setting( 'collection_logo_file_ID' ), T_('Collection logo/image'), NULL, $collection_logo_params );
+
+	$collection_favicon_params = array( 'file_type' => 'image', 'max_file_num' => 1, 'window_title' => T_('Select collection favicon'), 'root' => 'shared_0', 'size_name' => 'fit-128x128' );
+	$Form->fileselect( 'collection_favicon_file_ID', $edited_Blog->get_setting( 'collection_favicon_file_ID' ), T_('Collection favicon'), NULL, $collection_favicon_params );
+
+	// Section:
+	$blog_section_id = $action == 'copy' ? 1 : $edited_Blog->get( 'sec_ID' );
+	$SectionCache = & get_SectionCache();
+	$SectionCache->load_available( $blog_section_id );
+	if( count( $SectionCache->cache_available ) > 1 )
+	{ // If we have only one option in the list do not show select input
+		$Form->select_input_object( 'sec_ID', $blog_section_id, $SectionCache, T_('Section'), array( 'required' => true ) );
+	}
+
 $Form->end_fieldset();
 
 // Calculate how much locales are enabled in system
@@ -263,12 +284,12 @@ foreach( $locales as $locale_data )
 
 if( ! $is_creating )
 {
-	$Form->begin_fieldset( T_('Language / locale').get_manual_link( 'coll-locale-settings' ) );
+	$Form->begin_fieldset( T_('Language / locale').get_manual_link( 'coll-locale-settings' ), array( 'id' => 'language' ) );
 		if( $number_enabled_locales > 1 )
 		{ // More than 1 locale
 			$blog_locale_note = ( $current_User->check_perm( 'options', 'view' ) ) ?
 				'<a href="'.$admin_url.'?ctrl=regional">'.T_('Regional settings').' &raquo;</a>' : '';
-			$Form->select( 'blog_locale', $edited_Blog->get( 'locale' ), 'locale_options_return', T_('Collection Locale'), $blog_locale_note );
+		$Form->locale_selector( 'blog_locale', $edited_Blog->get( 'locale' ), array_keys( $edited_Blog->get_locales() ), T_('Collection Locales'), $blog_locale_note, array( 'link_coll_ID' => $edited_Blog->ID ) );
 
 			$Form->radio( 'blog_locale_source', $edited_Blog->get_setting( 'locale_source' ),
 					array(
@@ -278,15 +299,14 @@ if( ! $is_creating )
 
 			$Form->radio( 'blog_post_locale_source', $edited_Blog->get_setting( 'post_locale_source' ),
 					array(
-						array( 'post', T_('Always force to post locale') ),
-						array( 'blog', T_('Follow navigation locale') ),
-				), T_('Content Display'), true );
+						array( 'post', T_('Always force to Post locale') ),
+					array( 'blog', T_('Follow navigation locale'), '('.T_('Navigation/Widget Display').')' ),
+				), T_('Post Details Display'), true );
 
 			$Form->radio( 'blog_new_item_locale_source', $edited_Blog->get_setting( 'new_item_locale_source' ),
 					array(
-						array( 'use_coll', T_('Always use collection locale') ),
-						array( 'select_coll', T_('Allow select - use collection locale by default') ),
-						array( 'select_user', T_('Allow select - use user locale by default') ),
+						array( 'select_coll', T_('Default to collection\'s main locale') ),
+						array( 'select_user', T_('Default to user\'s locale') ),
 				), T_('New Posts'), true );
 		}
 		else
@@ -397,12 +417,8 @@ if( ! $is_creating )
 
 		$Form->text( 'blog_tagline', $edited_Blog->get( 'tagline' ), 50, T_('Tagline'), T_('This is typically displayed by a widget right under the collection name in the front-office.'), 250 );
 
-		$shortdesc_chars_count = utf8_strlen( html_entity_decode( $edited_Blog->get( 'shortdesc' ) ) );
-		$Form->text( 'blog_shortdesc', $edited_Blog->get( 'shortdesc' ), 60, T_('Short Description'), T_('This is is used in meta tag description and RSS feeds. NO HTML!')
-			.' ('.sprintf( T_('%s characters'), '<span id="blog_shortdesc_chars_count">'.$shortdesc_chars_count.'</span>' ).')', 250, 'large' );
-
-		$Form->textarea( 'blog_longdesc', $edited_Blog->get( 'longdesc' ), 5, T_('Long Description'), T_('This will be used in Open Graph tags and XML feeds. This may also be displayed by widgets in the front-office.')
-			.' '.T_(' HTML markup possible but not recommended.'), 50 );
+		$Form->textarea( 'blog_notes', $edited_Blog->get( 'notes' ), 5, T_('Dashboard notes'),
+			T_('Additional info. Appears in the backoffice.'), 50 );
 
 	$Form->end_fieldset();
 }
@@ -414,33 +430,6 @@ else
 	$Form->hidden( 'blog_shortdesc', $edited_Blog->get( 'shortdesc' ) );
 	$Form->hidden( 'blog_longdesc', $edited_Blog->get( 'longdesc' ) );
 }
-
-if( ! $is_creating )
-{
-	$Form->begin_fieldset( T_('Meta data').get_manual_link('blog-meta-data') );
-		$social_media_boilerplate_params = array( 'file_type' => 'image', 'max_file_num' => 1, 'window_title' => T_('Select logo for social media boilerplate'), 'root' => 'shared_0', 'size_name' => 'fit-320x320' );
-		$Form->fileselect( 'social_media_image_file_ID', $edited_Blog->get_setting( 'social_media_image_file_ID' ), T_('Social media boilerplate'), NULL, $social_media_boilerplate_params );
-		$Form->text( 'blog_keywords', $edited_Blog->get( 'keywords' ), 60, T_('Keywords'), T_('This is is used in meta tag keywords. NO HTML!'), 250, 'large' );
-		$Form->text( 'blog_footer_text', $edited_Blog->get_setting( 'blog_footer_text' ), 60, T_('Blog footer'), sprintf(
-			T_('Use &lt;br /&gt; to insert a line break. You might want to put your copyright or <a href="%s" target="_blank">creative commons</a> notice here.'),
-			'http://creativecommons.org/license/' ), 1000, 'large' );
-		$Form->textarea( 'single_item_footer_text', $edited_Blog->get_setting( 'single_item_footer_text' ), 2, T_('Single post footer'),
-			T_('This will be displayed after each post in single post view.').' '.sprintf( T_('Available variables: %s.'), '<b>$perm_url$</b>, <b>$title$</b>, <b>$excerpt$</b>, <b>$author$</b>, <b>$author_login$</b>' ), 50 );
-		$Form->textarea( 'xml_item_footer_text', $edited_Blog->get_setting( 'xml_item_footer_text' ), 2, T_('Post footer in RSS/Atom'),
-			T_('This will be appended to each post in your RSS/Atom feeds.').' '.sprintf( T_('Available variables: %s.'), T_('same as above') ), 50 );
-		$Form->textarea( 'blog_notes', $edited_Blog->get( 'notes' ), 5, T_('Notes'),
-			T_('Additional info. Appears in the backoffice.'), 50 );
-	$Form->end_fieldset();
-}
-else
-{
-	$Form->hidden( 'blog_keywords', $edited_Blog->get( 'keywords' ) );
-	$Form->hidden( 'blog_footer_text', $edited_Blog->get_setting( 'blog_footer_text' ) );
-	$Form->hidden( 'single_item_footer_text', $edited_Blog->get_setting( 'single_item_footer_text' ) );
-	$Form->hidden( 'xml_item_footer_text', $edited_Blog->get_setting( 'xml_item_footer_text' ) );
-	$Form->hidden( 'blog_notes', $edited_Blog->get( 'notes' ) );
-}
-
 
 $Form->buttons( array( array( 'submit', 'submit', ( $action == 'copy' ? T_('Duplicate NOW!') : T_('Save Changes!') ), 'SaveButton' ) ) );
 

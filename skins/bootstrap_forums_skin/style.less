@@ -119,8 +119,7 @@ ol.breadcrumb {
 			padding-left: 0;
 			padding-right: 0;
 			select {
-				margin-top: -5px;
-				margin-bottom: -6px;
+				margin-top: 3px;
 				width: auto;
 			}
 		}
@@ -214,6 +213,12 @@ ol.breadcrumb {
 				color: inherit;
 			}
 		}
+	}
+	.vote_score__status_new {
+		color: #FF6600;
+	}
+	.vote_score__status_updated {
+		color: #990000;
 	}
 	.ft_count {
 		margin-top: 5px;
@@ -638,6 +643,7 @@ ul.legend {
 			.ft_avatar {
 				padding: 0px;
 				text-align: center;
+				float: left;
 				/* @MILOS > Still testing to see if this is overrulled by: line 992
 				span > img.loadimg, a > img.loadimg {
 					border-radius: 50% !important;
@@ -667,6 +673,12 @@ ul.legend {
 		}
 		> a, > span, a > img {
 			display: inline-block;
+		}
+	}
+	// Special style for enabled voting panel with left score mode:
+	.evo_voting_layout__left_score {
+		.post_main, .evo_comment_text {
+			padding-left: 25px;
 		}
 	}
 }
@@ -722,6 +734,24 @@ a.btn+.vote_spam {
 		line-height: 20px;
 	}
 }
+.evo_voting_panel__left_score {
+	height: auto;
+	text-align: center;
+	margin: 0;
+	a.action_icon span.fa {
+		margin: 0;
+	}
+	.vote_score {
+		display: block;
+		font-weight: bold;
+	}
+}
+.ft_avatar, .evo_comment_avatar {
+	.evo_voting_panel__left_score {
+		width: 100%;
+		float: none;
+	}
+}
 // A link to reply on comment:
 .comment_reply {
 	height: 22px;
@@ -732,11 +762,6 @@ a.btn+.vote_spam {
 // Button to quote a reply/topic:
 .quote_button {
 	margin-right: 10px;
-}
-
-// Form elements on item edit page
-label.control-label[for=post_title] {
-	width: auto;
 }
 
 // Profile page
@@ -1168,6 +1193,9 @@ aside .widget_core_coll_search_form {
 		.topictitle {
 			display: inline;
 			min-width: 200px;
+			+ .btn {
+				margin: -3px 0 0 30px;
+			}
 		}
 	}
 	.cell1 {

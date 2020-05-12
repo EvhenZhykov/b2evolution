@@ -7,7 +7,7 @@
  *
  * @license GNU GPL v2 - {@link http://b2evolution.net/about/gnu-gpl-license}
  *
- * @copyright (c)2003-2018 by Francois Planque - {@link http://fplanque.com/}
+ * @copyright (c)2003-2020 by Francois Planque - {@link http://fplanque.com/}
  *
  * @package htsrv
  */
@@ -40,6 +40,11 @@ function out_echo( $message, $specialchars, $display = true )
 	{
 		$message['specialchars'] = 0;
 	}
+
+	// Do not append Debuglog and JSlog to response!
+	global $debug, $debug_jslog;
+	$debug = false;
+	$debug_jslog = false;
 
 	$response['data'] = $message;
 	if( $display )
@@ -80,12 +85,6 @@ if( isset( $_SERVER["CONTENT_LENGTH"] ) )
 // Stop a request from the blocked IP addresses or Domains
 antispam_block_request();
 
-// Do not append Debuglog to response!
-$debug = false;
-
-// Do not append Debug JSlog to response!
-$debug_jslog = false;
-
 // Don't check new updates from b2evolution.net (@see b2evonet_get_updates()),
 // in order to don't break the response data:
 $allow_evo_stats = false;
@@ -96,9 +95,11 @@ param( 'upload', 'boolean', true );
 param( 'root_and_path', 'filepath', true );
 param( 'blog', 'integer' );
 param( 'link_owner', 'string' );
+param( 'link_position', 'string', NULL );
 param( 'fm_mode', 'string' );
 // Use the glyph or font-awesome icons if requested by skin
 param( 'b2evo_icons_type', 'string', '' );
+param( 'prefix', 'string', '' );
 
 // Check that this action request is not a CSRF hacked request:
 if( ! $Session->assert_received_crumb( 'file', false ) )
@@ -137,6 +138,11 @@ if( ! empty( $link_owner ) )
 }
 // Try to get LinkOwner by type and ID:
 $LinkOwner = get_LinkOwner( ( $link_owner_is_temp ? 'temporary' : $link_owner_type ), $link_owner_ID );
+
+if( $link_owner_type == 'comment' && $prefix == 'meta_' )
+{	// Set comment type for proper permission check - meta comment attachments are always allowed:
+	$LinkOwner->Comment->type = 'meta';
+}
 
 if( $upload && ! check_perm_upload_files( $LinkOwner, $fm_FileRoot ) )
 {
@@ -264,7 +270,7 @@ if( $upload )
 			$LinkCache = & get_LinkCache();
 			do
 			{
-				$new_link_ID = $newFile->link_to_Object( $LinkOwner );
+				$new_link_ID = $newFile->link_to_Object( $LinkOwner, 0, $link_position );
 				// Check if Link has been created really
 				$new_Link = & $LinkCache->get_by_ID( $new_link_ID, false, false );
 			}

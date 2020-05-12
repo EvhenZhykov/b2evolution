@@ -32,7 +32,8 @@ class Userfield extends DataObject
 	var $type = '';
 	var $name = '';
 	var $options;
-	var $required = 'optional';
+	var $required = 'recommended';
+	var $visibility = 'unrestricted';
 	var $duplicated = 'allowed';
 	var $order = '';
 	var $suggest = '1';
@@ -61,6 +62,7 @@ class Userfield extends DataObject
 			$this->name       = $db_row->ufdf_name;
 			$this->options    = $db_row->ufdf_options;
 			$this->required   = $db_row->ufdf_required;
+			$this->visibility = isset( $db_row->ufdf_visibility ) ? $db_row->ufdf_visibility : 'unrestricted';
 			$this->duplicated = $db_row->ufdf_duplicated;
 			$this->order      = $db_row->ufdf_order;
 			$this->suggest    = $db_row->ufdf_suggest;
@@ -85,6 +87,29 @@ class Userfield extends DataObject
 
 
 	/**
+	 * Format options array
+	 *
+	 * @param array Source options
+	 * @param string Format
+	 * @return array Formatted Options
+	 */
+	static function format_options( $options, $format = NULL )
+	{
+		if( $format == 'radio' )
+		{	// Format for radio form element:
+			$formatted_options = array();
+			foreach( $options as $key => $title )
+			{
+				$formatted_options[] = array( 'value' => $key, 'label' => $title );
+			}
+			return $formatted_options;
+		}
+
+		return $options;
+	}
+
+
+	/**
 	 * Returns array of possible user field types
 	 *
 	 * @return array
@@ -92,13 +117,13 @@ class Userfield extends DataObject
 	static function get_types()
 	{
 		return array(
-			'email'  => T_('Email address'),
-			'word'   => T_('Single word'),
+			'word'   => T_('String'),
+			'number' => T_('Numeric'),
 			'list'   => T_('Option list'),
-			'number' => T_('Number'),
-			'phone'  => T_('Phone number'),
+			'text'   => T_('Multiline text'),
+			'email'  => T_('Email address'),
 			'url'    => T_('URL'),
-			'text'   => T_('Text'),
+			'phone'  => T_('Phone number'),
 		 );
 	}
 
@@ -106,31 +131,49 @@ class Userfield extends DataObject
 	/**
 	 * Returns array of possible user field required types
 	 *
+	 * @param string Format
 	 * @return array
 	 */
-	function get_requireds()
+	static function get_requireds( $format = NULL )
 	{
-		return array(
-			array( 'value' => 'hidden', 'label' => T_('Hidden') ),
-			array( 'value' => 'optional', 'label' => T_('Optional') ),
-			array( 'value' => 'recommended', 'label' => T_('Recommended') ),
-			array( 'value' => 'require', 'label' => T_('Required') ),
-		 );
+		return Userfield::format_options( array(
+				'require'     => T_('Required'),
+				'recommended' => T_('Recommended'),
+				'optional'    => T_('Optional'),
+				'hidden'      => T_('Hidden'),
+			), $format );
+	}
+
+
+	/**
+	 * Returns array of possible user field visibilities
+	 *
+	 * @param string Format
+	 * @return array
+	 */
+	static function get_visibilities( $format = NULL )
+	{
+		return Userfield::format_options( array(
+				'unrestricted' => T_('Unrestricted'),
+				'private'      => T_('Private (owner + admins)'),
+				'admin'        => T_('Admins only'),
+			), $format );
 	}
 
 
 	/**
 	 * Returns array of possible user field duplicated types
 	 *
+	 * @param string Format
 	 * @return array
 	 */
-	function get_duplicateds()
+	static function get_duplicateds( $format = NULL )
 	{
-		return array(
-			array( 'value' => 'forbidden', 'label' => T_('Forbidden') ),
-			array( 'value' => 'allowed', 'label' => T_('Allowed') ),
-			array( 'value' => 'list', 'label' => T_('List style') ),
-		 );
+		return Userfield::format_options( array(
+				'forbidden' => T_('Forbidden'),
+				'allowed'   => T_('Allowed'),
+				'list'      => T_('List style'),
+			), $format );
 	}
 
 	/**
@@ -219,6 +262,10 @@ class Userfield extends DataObject
 		// Required
 		param_string_not_empty( 'ufdf_required', 'Please select Hidden, Optional, Recommended or Required.' );
 		$this->set_from_Request( 'required' );
+
+		// Field visibility
+		param_string_not_empty( 'ufdf_visibility', 'Please select Field visibility' );
+		$this->set_from_Request( 'visibility' );
 
 		// Duplicated
 		param_string_not_empty( 'ufdf_duplicated', 'Please select Forbidden, Allowed or List style.' );
